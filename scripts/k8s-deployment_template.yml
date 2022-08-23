@@ -112,8 +112,8 @@ spec:
         app: APP_NAME
     spec:                        # Spec for the container which will run in the Pod
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
-        runAsUser: 10222           # using a non privileged user
-        runAsGroup: 10222          # using the group 'gouser' created in Dockerfile in the Alpine image
+        runAsUser: 1221           # using a non privileged user
+        runAsGroup: 1221          # using the group 'gouser' created in Dockerfile
         fsGroup: 100             # by adding fsGroup field, all processes of the container are also part
                                  # of the supplementary group ID 100 (users).
         supplementalGroups:
@@ -125,8 +125,8 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
-          runAsUser: 10222           # using the user 'gouser' created in Dockerfile in the Alpine image
-          runAsGroup: 10222          # using the group 'gouser' created in Dockerfile in the Alpine image
+          runAsUser: 1221           # using the user 'gouser' created in Dockerfile
+          runAsGroup: 1221          # using the group 'gouser' created in Dockerfile
           capabilities:
             drop:
               - 'ALL'
