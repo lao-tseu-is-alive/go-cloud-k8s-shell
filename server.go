@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,7 +25,7 @@ import (
 )
 
 const (
-	VERSION                = "0.1.4"
+	VERSION                = "0.1.5"
 	APP                    = "go-cloud-k8s-shell"
 	defaultProtocol        = "http"
 	defaultPort            = 9999
@@ -265,7 +267,7 @@ func GetKubernetesConnInfo(logger *log.Logger) (*K8sInfo, ErrorConfig) {
 		}
 	}
 	urlVersion := fmt.Sprintf("%s/openapi/v2", k8sUrl)
-	res, err := GetJsonFromUrl(urlVersion, info.Token, logger)
+	res, err := GetJsonFromUrl(urlVersion, info.Token, K8sCaCert, logger)
 	if err != nil {
 
 		logger.Printf("GetKubernetesConnInfo: error in GetJsonFromUrl(url:%s) err:%v", urlVersion, err)
@@ -292,7 +294,7 @@ func GetKubernetesConnInfo(logger *log.Logger) (*K8sInfo, ErrorConfig) {
 	}
 }
 
-func GetJsonFromUrl(url string, token string, logger *log.Logger) (string, error) {
+func GetJsonFromUrl(url string, token string, caCert []byte, logger *log.Logger) (string, error) {
 	// Create a Bearer string by appending string access token
 	var bearer = "Bearer " + token
 
@@ -301,10 +303,17 @@ func GetJsonFromUrl(url string, token string, logger *log.Logger) (string, error
 
 	// add authorization header to the req
 	req.Header.Add("Authorization", bearer)
-
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: caCertPool,
+		},
+	}
 	// Send req using http Client
 	client := &http.Client{
-		Timeout: defaultReadTimeout,
+		Transport: tr,
+		Timeout:   defaultReadTimeout,
 	}
 	resp, err := client.Do(req)
 
