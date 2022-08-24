@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION                = "0.1.3"
+	VERSION                = "0.1.4"
 	APP                    = "go-cloud-k8s-shell"
 	defaultProtocol        = "http"
 	defaultPort            = 9999
@@ -197,7 +197,7 @@ func GetKubernetesApiUrlFromEnv() (string, error) {
 			msg: "ERROR: KUBERNETES_SERVICE_HOST ENV variable does not exist (not inside K8s ?).",
 		}
 	}
-	k8sApiUrl = fmt.Sprintf("%s:%s", k8sApiUrl, val)
+	k8sApiUrl = fmt.Sprintf("%s%s", k8sApiUrl, val)
 	val, exist = os.LookupEnv("KUBERNETES_SERVICE_PORT")
 	if exist {
 		srvPort, err = strconv.Atoi(val)
@@ -217,7 +217,7 @@ func GetKubernetesApiUrlFromEnv() (string, error) {
 	return fmt.Sprintf("%s:%d", k8sApiUrl, srvPort), nil
 }
 
-func GetKubernetesConnInfo() (*K8sInfo, ErrorConfig) {
+func GetKubernetesConnInfo(logger *log.Logger) (*K8sInfo, ErrorConfig) {
 	const K8sServiceAccountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 	K8sNamespacePath := fmt.Sprintf("%s/namespace", K8sServiceAccountPath)
 	K8sTokenPath := fmt.Sprintf("%s/token", K8sServiceAccountPath)
@@ -265,17 +265,26 @@ func GetKubernetesConnInfo() (*K8sInfo, ErrorConfig) {
 		}
 	}
 	urlVersion := fmt.Sprintf("%s/openapi/v2", k8sUrl)
-	res, err := GetJsonFromUrl(urlVersion, info.Token)
+	res, err := GetJsonFromUrl(urlVersion, info.Token, logger)
+	if err != nil {
 
-	var myVersionRegex = regexp.MustCompile("{\"title\":\"(?P<title>.+)\",\"version\":\"(?P<version>.+)\"}")
-	match := myVersionRegex.FindStringSubmatch(strings.TrimSpace(res[:150]))
-	k8sVersionFields := make(map[string]string)
-	for i, name := range myVersionRegex.SubexpNames() {
-		if i != 0 && name != "" {
-			k8sVersionFields[name] = match[i]
+		logger.Printf("GetKubernetesConnInfo: error in GetJsonFromUrl(url:%s) err:%v", urlVersion, err)
+		//return &info, ErrorConfig{
+		//	err: err,
+		//	msg: fmt.Sprintf("GetKubernetesConnInfo: error doing GetJsonFromUrl(url:%s)", urlVersion),
+		//}
+	} else {
+		logger.Printf("GetKubernetesConnInfo: successfully returned from GetJsonFromUrl(url:%s)", urlVersion)
+		var myVersionRegex = regexp.MustCompile("{\"title\":\"(?P<title>.+)\",\"version\":\"(?P<version>.+)\"}")
+		match := myVersionRegex.FindStringSubmatch(strings.TrimSpace(res[:150]))
+		k8sVersionFields := make(map[string]string)
+		for i, name := range myVersionRegex.SubexpNames() {
+			if i != 0 && name != "" {
+				k8sVersionFields[name] = match[i]
+			}
 		}
+		info.Version = fmt.Sprintf("%s, %s", k8sVersionFields["title"], k8sVersionFields["version"])
 	}
-	info.Version = fmt.Sprintf("%s, %s", k8sVersionFields["title"], k8sVersionFields["version"])
 
 	return &info, ErrorConfig{
 		err: nil,
@@ -283,7 +292,7 @@ func GetKubernetesConnInfo() (*K8sInfo, ErrorConfig) {
 	}
 }
 
-func GetJsonFromUrl(url string, token string) (string, error) {
+func GetJsonFromUrl(url string, token string, logger *log.Logger) (string, error) {
 	// Create a Bearer string by appending string access token
 	var bearer = "Bearer " + token
 
@@ -295,22 +304,19 @@ func GetJsonFromUrl(url string, token string) (string, error) {
 
 	// Send req using http Client
 	client := &http.Client{
-		Transport:     nil,
-		CheckRedirect: nil,
-		Jar:           nil,
-		Timeout:       defaultReadTimeout,
+		Timeout: defaultReadTimeout,
 	}
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Println("Error on response.\n[ERROR] -", err)
+		logger.Println("Error on response.\n[ERROR] -", err)
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("Error while reading the response bytes:", err)
+		logger.Println("Error while reading the response bytes:", err)
 		return "", err
 	}
 	return string([]byte(body)), nil
@@ -508,7 +514,7 @@ func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
 		s.logger.Printf("💥💥 ERROR: 'GetKubernetesApiUrlFromEnv() returned an error : %+#v'", err)
 	} else {
 		// here we can assume that we are inside a k8s container...
-		info, errConnInfo := GetKubernetesConnInfo()
+		info, errConnInfo := GetKubernetesConnInfo(s.logger)
 		if errConnInfo.err != nil {
 			s.logger.Printf("💥💥 ERROR: 'GetKubernetesConnInfo() returned an error : %s : %+#v'", errConnInfo.msg, errConnInfo.err)
 		}
