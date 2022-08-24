@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -515,7 +516,7 @@ func TestMainExecution(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Should return an http status ok")
 
-	receivedJson, err := ioutil.ReadAll(resp.Body)
+	receivedJson, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Error reading response body: %v\n", err)
 	}

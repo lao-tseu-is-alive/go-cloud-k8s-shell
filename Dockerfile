@@ -34,14 +34,19 @@ FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y iproute2 nmap curl jq && apt-get -y upgrade
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 1221 gouser
 
-# Switch to non-root user:
-USER gouser
 WORKDIR /home/gouser
 
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /app/go-shell-server .
 COPY scripts/checkK8SApiInsideContainer.sh ./
 COPY scripts/getK8SApiFromUrl.sh ./
+
+RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh
+
+# Switch to non-root user:
+USER gouser
+
+
 
 # Expose port 9999 to the outside world, go-shell-server will use the env PORT as listening port or 9999 as default
 EXPOSE 9999
