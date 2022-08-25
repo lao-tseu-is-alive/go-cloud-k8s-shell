@@ -8,7 +8,7 @@ kind: Namespace
 metadata:
   name: test-APP_NAME
   labels:
-    name: test
+    env: test
     app: APP_NAME
 ---
 apiVersion: v1
@@ -16,6 +16,8 @@ kind: ResourceQuota
 metadata:
   name: compute-resources
   namespace: test-APP_NAME
+  labels:
+    app: APP_NAME
 spec:
   hard:
     requests.cpu: "1"
@@ -27,7 +29,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   namespace: test-APP_NAME
-  name: pod-reader
+  name: pod-reader-role
+  labels:
+    app: APP_NAME
 rules:
   - apiGroups: [""]  # "" indicates the core API group
     resources: ["pods", "namespaces"]
@@ -36,20 +40,24 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: pod-reader
+  name: pod-reader-role-binding
+  labels:
+    app: APP_NAME
 subjects:
   - kind: Group
     name: system:serviceaccounts
     apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
-  name: pod-reader
+  name: pod-reader-role
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: service-reader
+  name: service-reader-role
+  labels:
+    app: APP_NAME
 rules:
   - apiGroups: [""]
     resources: ["services"]
@@ -59,14 +67,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: service-reader
+  name: service-reader-role-binding
+  labels:
+    app: APP_NAME
 subjects:
   - kind: Group
     name: system:serviceaccounts
     apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
-  name: service-reader
+  name: service-reader-role
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
@@ -94,13 +104,15 @@ spec:
       port: 9999
       targetPort: 9999            # Should match the PORT env variable in deployment and containerPort that the Go application listens on
   selector:
-    app: APP_NAME         # Map any pod with label `app=go-hello-world` to this service
+    app: APP_NAME         # Map any pod with this label `app=APP_NAME` to this service
 ---
 apiVersion: apps/v1
 kind: Deployment                 # Type of Kubernetes resource
 metadata:
   name: APP_NAME           # Name of the Kubernetes resource
   namespace: test-APP_NAME
+  labels:
+    app: APP_NAME
 spec:
   replicas: 2                    # Number of pods to run at any given time
   selector:
