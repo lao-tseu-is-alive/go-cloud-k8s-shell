@@ -36,6 +36,9 @@ rules:
   - apiGroups: [""]  # "" indicates the core API group
     resources: ["pods", "namespaces"]
     verbs: ["get", "watch", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -122,7 +125,7 @@ spec:
     metadata:
       labels:                    # The labels that will be applied to all the pods in this deployment
         app: APP_NAME
-    spec:                        # Spec for the container which will run in the Pod
+    spec:                        # Spec for the Pod base config, securityContext can be overridden in container
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
         runAsUser: 1221           # using a non privileged user
         runAsGroup: 1221          # using the group 'gouser' created in Dockerfile
