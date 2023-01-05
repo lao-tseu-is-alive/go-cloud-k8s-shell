@@ -1,14 +1,14 @@
 ---
 ### TEMPLATE FOR A SERVICE AND DEPLOYMENT ON KUBERNETES just substitute the next keywords with your own values
 ### go-cloud-k8s-shell     : the name of your application or container image
-### v0.1.5  : the version of the app image to deploy
+### v0.1.7  : the version of the app image to deploy
 ### ghcr.io/lao-tseu-is-alive  : the prefix to your images in your container registry
 apiVersion: v1
 kind: Namespace
 metadata:
   name: test-go-cloud-k8s-shell
   labels:
-    name: test
+    env: test
     app: go-cloud-k8s-shell
 ---
 apiVersion: v1
@@ -16,6 +16,8 @@ kind: ResourceQuota
 metadata:
   name: compute-resources
   namespace: test-go-cloud-k8s-shell
+  labels:
+    app: go-cloud-k8s-shell
 spec:
   hard:
     requests.cpu: "1"
@@ -27,7 +29,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   namespace: test-go-cloud-k8s-shell
-  name: pod-reader
+  name: pod-reader-role
+  labels:
+    app: go-cloud-k8s-shell
 rules:
   - apiGroups: [""]  # "" indicates the core API group
     resources: ["pods", "namespaces"]
@@ -36,20 +40,24 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: pod-reader
+  name: pod-reader-role-binding
+  labels:
+    app: go-cloud-k8s-shell
 subjects:
   - kind: Group
     name: system:serviceaccounts
     apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
-  name: pod-reader
+  name: pod-reader-role
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: service-reader
+  name: service-reader-role
+  labels:
+    app: go-cloud-k8s-shell
 rules:
   - apiGroups: [""]
     resources: ["services"]
@@ -59,14 +67,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: service-reader
+  name: service-reader-role-binding
+  labels:
+    app: go-cloud-k8s-shell
 subjects:
   - kind: Group
     name: system:serviceaccounts
     apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
-  name: service-reader
+  name: service-reader-role
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
@@ -94,13 +104,15 @@ spec:
       port: 9999
       targetPort: 9999            # Should match the PORT env variable in deployment and containerPort that the Go application listens on
   selector:
-    app: go-cloud-k8s-shell         # Map any pod with label `app=go-hello-world` to this service
+    app: go-cloud-k8s-shell         # Map any pod with this label `app=go-cloud-k8s-shell` to this service
 ---
 apiVersion: apps/v1
 kind: Deployment                 # Type of Kubernetes resource
 metadata:
   name: go-cloud-k8s-shell           # Name of the Kubernetes resource
   namespace: test-go-cloud-k8s-shell
+  labels:
+    app: go-cloud-k8s-shell
 spec:
   replicas: 2                    # Number of pods to run at any given time
   selector:
@@ -120,7 +132,7 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.5
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.7
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
