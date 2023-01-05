@@ -36,6 +36,7 @@ rules:
   - apiGroups: [""]  # "" indicates the core API group
     resources: ["pods", "namespaces"]
     verbs: ["get", "watch", "list"]
+# to allow reading pods logs with : kubectl logs -l app=go-cloud-k8s-shell --all-containers=true -n test-go-cloud-k8s-shell
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
