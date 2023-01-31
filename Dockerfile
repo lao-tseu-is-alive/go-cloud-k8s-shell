@@ -49,7 +49,15 @@ RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh
 
 # Switch to non-root user:
 USER gouser
-
+RUN echo $'source <(kubectl completion bash)\n\
+alias k=kubectl\n\
+source <(kubectl completion bash | sed ''s|__start_kubectl kubectl|__start_kubectl k|g'')\n\
+APISERVER=https://kubernetes.default.svc \n\
+SERVICEACCOUNT=/var/run/secrets/kubernetes.io/serviceaccount \n\
+NAMESPACE=$(cat ${SERVICEACCOUNT}/namespace) \n\
+TOKEN=$(cat ${SERVICEACCOUNT}/token) \n\
+CACERT=${SERVICEACCOUNT}/ca.crt\n\
+export CACERT TOKEN NAMESPACE SERVICEACCOUNT APISERVER' >> ~/.bashrc
 
 
 # Expose port 9999 to the outside world, go-shell-server will use the env PORT as listening port or 9999 as default

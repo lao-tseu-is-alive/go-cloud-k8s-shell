@@ -1,15 +1,15 @@
 ---
 ### TEMPLATE FOR A SERVICE AND DEPLOYMENT ON KUBERNETES just substitute the next keywords with your own values
-### APP_NAME     : the name of your application or container image
-### APP_VERSION  : the version of the app image to deploy
-### GO_CONTAINER_REGISTRY_PREFIX  : the prefix to your images in your container registry
+### go-cloud-k8s-shell     : the name of your application or container image
+### v0.1.11  : the version of the app image to deploy
+### ghcr.io/lao-tseu-is-alive  : the prefix to your images in your container registry
 apiVersion: v1
 kind: Namespace
 metadata:
   name: go-testing
   labels:
     env: test
-    app: APP_NAME
+    app: go-cloud-k8s-shell
 ---
 apiVersion: v1
 kind: ResourceQuota
@@ -17,7 +17,7 @@ metadata:
   name: compute-resources
   namespace: go-testing
   labels:
-    app: APP_NAME
+    app: go-cloud-k8s-shell
 spec:
   hard:
     requests.cpu: "1"
@@ -31,7 +31,7 @@ metadata:
   namespace: go-testing
   name: pod-reader-role
   labels:
-    app: APP_NAME
+    app: go-cloud-k8s-shell
 rules:
   - apiGroups: [""]  # "" indicates the core API group
     resources: ["pods", "namespaces"]
@@ -46,7 +46,7 @@ kind: ClusterRoleBinding
 metadata:
   name: pod-reader-role-binding
   labels:
-    app: APP_NAME
+    app: go-cloud-k8s-shell
 subjects:
   - kind: Group
     name: system:serviceaccounts
@@ -61,7 +61,7 @@ kind: ClusterRole
 metadata:
   name: service-reader-role
   labels:
-    app: APP_NAME
+    app: go-cloud-k8s-shell
 rules:
   - apiGroups: [""]
     resources: ["services"]
@@ -73,7 +73,7 @@ kind: ClusterRoleBinding
 metadata:
   name: service-reader-role-binding
   labels:
-    app: APP_NAME
+    app: go-cloud-k8s-shell
 subjects:
   - kind: Group
     name: system:serviceaccounts
@@ -86,10 +86,10 @@ roleRef:
 apiVersion: v1
 kind: Service                    # Type of kubernetes resource
 metadata:
-  name: APP_NAME-service   # Name of the resource
+  name: go-cloud-k8s-shell-service   # Name of the resource
   namespace: go-testing
   labels:     # The labels that will be applied
-    app: APP_NAME
+    app: go-cloud-k8s-shell
   annotations:
     externalTrafficPolicy: "local"
 spec:
@@ -108,24 +108,24 @@ spec:
       port: 9999
       targetPort: 9999            # Should match the PORT env variable in deployment and containerPort that the Go application listens on
   selector:
-    app: APP_NAME         # Map any pod with this label `app=APP_NAME` to this service
+    app: go-cloud-k8s-shell         # Map any pod with this label `app=go-cloud-k8s-shell` to this service
 ---
 apiVersion: apps/v1
 kind: Deployment                 # Type of Kubernetes resource
 metadata:
-  name: APP_NAME           # Name of the Kubernetes resource
+  name: go-cloud-k8s-shell           # Name of the Kubernetes resource
   namespace: go-testing
   labels:
-    app: APP_NAME
+    app: go-cloud-k8s-shell
 spec:
   replicas: 2                    # Number of pods to run at any given time
   selector:
     matchLabels:
-      app: APP_NAME              # This deployment applies to any Pods matching the specified label
+      app: go-cloud-k8s-shell              # This deployment applies to any Pods matching the specified label
   template:                      # This deployment will create a set of pods using the configurations in this template
     metadata:
       labels:                    # The labels that will be applied to all the pods in this deployment
-        app: APP_NAME
+        app: go-cloud-k8s-shell
     spec:                        # Spec for the Pod base config, securityContext can be overridden in container
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
         runAsUser: 1221           # using a non privileged user
@@ -135,8 +135,8 @@ spec:
         supplementalGroups:
           - 100
       containers:
-      - name: APP_NAME
-        image: GO_CONTAINER_REGISTRY_PREFIX/APP_NAME:APP_VERSION
+      - name: go-cloud-k8s-shell
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.11
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
