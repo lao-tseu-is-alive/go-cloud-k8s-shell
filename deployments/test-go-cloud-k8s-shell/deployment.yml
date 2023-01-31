@@ -6,7 +6,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: testing
+  name: test-go-cloud-k8s-shell
   labels:
     env: test
     app: go-cloud-k8s-shell
@@ -15,7 +15,7 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: compute-resources
-  namespace: testing
+  namespace: test-go-cloud-k8s-shell
   labels:
     app: go-cloud-k8s-shell
 spec:
@@ -28,7 +28,7 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  namespace: testing
+  namespace: test-go-cloud-k8s-shell
   name: pod-reader-role
   labels:
     app: go-cloud-k8s-shell
@@ -87,7 +87,7 @@ apiVersion: v1
 kind: Service                    # Type of kubernetes resource
 metadata:
   name: go-cloud-k8s-shell-service   # Name of the resource
-  namespace: testing
+  namespace: test-go-cloud-k8s-shell
   labels:     # The labels that will be applied
     app: go-cloud-k8s-shell
   annotations:
@@ -114,7 +114,7 @@ apiVersion: apps/v1
 kind: Deployment                 # Type of Kubernetes resource
 metadata:
   name: go-cloud-k8s-shell           # Name of the Kubernetes resource
-  namespace: testing
+  namespace: test-go-cloud-k8s-shell
   labels:
     app: go-cloud-k8s-shell
 spec:

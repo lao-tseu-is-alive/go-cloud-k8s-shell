@@ -1,7 +1,7 @@
 ---
 ### TEMPLATE FOR A SERVICE AND DEPLOYMENT ON KUBERNETES just substitute the next keywords with your own values
 ### go-cloud-k8s-shell     : the name of your application or container image
-### v0.1.8  : the version of the app image to deploy
+### v0.1.10  : the version of the app image to deploy
 ### ghcr.io/lao-tseu-is-alive  : the prefix to your images in your container registry
 apiVersion: v1
 kind: Namespace
@@ -136,7 +136,7 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.8
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.10
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false

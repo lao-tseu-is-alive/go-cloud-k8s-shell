@@ -31,7 +31,7 @@ FROM ubuntu:22.04
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
 # https://docs.docker.com/engine/reference/builder/#user
 
-RUN apt-get update && apt-get install -y iproute2 nmap curl jq && apt-get -y upgrade
+RUN apt-get update && apt-get install -y iproute2 nmap curl jq iputils-ping dnsutils && apt-get -y upgrade
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 1221 gouser
 WORKDIR /tmp
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
