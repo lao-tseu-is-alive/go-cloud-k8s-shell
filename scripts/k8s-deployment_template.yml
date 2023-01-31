@@ -6,7 +6,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: test-APP_NAME
+  name: testing
   labels:
     env: test
     app: APP_NAME
@@ -15,7 +15,7 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: compute-resources
-  namespace: test-APP_NAME
+  namespace: testing
   labels:
     app: APP_NAME
 spec:
@@ -28,7 +28,7 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  namespace: test-APP_NAME
+  namespace: testing
   name: pod-reader-role
   labels:
     app: APP_NAME
@@ -87,7 +87,7 @@ apiVersion: v1
 kind: Service                    # Type of kubernetes resource
 metadata:
   name: APP_NAME-service   # Name of the resource
-  namespace: test-APP_NAME
+  namespace: testing
   labels:     # The labels that will be applied
     app: APP_NAME
   annotations:
@@ -114,7 +114,7 @@ apiVersion: apps/v1
 kind: Deployment                 # Type of Kubernetes resource
 metadata:
   name: APP_NAME           # Name of the Kubernetes resource
-  namespace: test-APP_NAME
+  namespace: testing
   labels:
     app: APP_NAME
 spec:

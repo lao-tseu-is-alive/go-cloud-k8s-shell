@@ -42,8 +42,10 @@ WORKDIR /home/gouser
 COPY --from=builder /app/go-shell-server .
 COPY scripts/checkK8SApiInsideContainer.sh ./
 COPY scripts/getK8SApiFromUrl.sh ./
+COPY scripts/getServiceEndPointFromInsideContainer.sh ./
 
-RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh
+
+RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh && chmod a+x ./getServiceEndPointFromInsideContainer.sh
 
 # Switch to non-root user:
 USER gouser
