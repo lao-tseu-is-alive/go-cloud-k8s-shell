@@ -9,7 +9,16 @@ metadata:
   name: go-testing
   labels:
     env: test
-    app: APP_NAME
+    app: goeland
+    # https://kubernetes.io/docs/concepts/security/pod-security-admission/
+    # The per-mode level label indicates which policy level to apply for the mode.
+    # MODE must be one of `enforce`, `audit`, or `warn`.
+    # LEVEL must be one of `privileged`, `baseline`, or `restricted`.
+    # pod-security.kubernetes.io/<MODE>: <LEVEL>
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
 ---
 apiVersion: v1
 kind: ResourceQuota
@@ -18,17 +27,6 @@ metadata:
   namespace: go-testing
   labels:
     app: APP_NAME
-    # https://kubernetes.io/docs/concepts/security/pod-security-admission/
-    # The per-mode level label indicates which policy level to apply for the mode.
-    # MODE must be one of `enforce`, `audit`, or `warn`.
-    # LEVEL must be one of `privileged`, `baseline`, or `restricted`.
-    # pod-security.kubernetes.io/<MODE>: <LEVEL>
-    pod-security.kubernetes.io/enforce: baseline
-    pod-security.kubernetes.io/enforce-version: latest
-    pod-security.kubernetes.io/warn: baseline
-    pod-security.kubernetes.io/warn-version: latest
-    pod-security.kubernetes.io/audit: restricted
-    pod-security.kubernetes.io/audit-version: restricted
 spec:
 ### ADAPT the values above to your need remember that you m
   hard:
@@ -36,6 +34,32 @@ spec:
     requests.memory: 8Gi
     limits.cpu: "16"
     limits.memory: 16Gi
+---
+## https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/memory-default-namespace/
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: mem-limit-range
+spec:
+  limits:
+    - default:
+        memory: 512Mi
+      defaultRequest:
+        memory: 256Mi
+      type: Container
+---
+## https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/cpu-default-namespace/
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-limit-range
+spec:
+  limits:
+    - default:
+        cpu: 1
+      defaultRequest:
+        cpu: 0.5
+      type: Container
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -78,7 +102,6 @@ rules:
   - apiGroups: [""]
     resources: ["services"]
     verbs: ["get", "watch", "list"]
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -140,6 +163,8 @@ spec:
         app: APP_NAME
     spec:                        # Spec for the Pod base config, securityContext can be overridden in container
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+        seccompProfile:
+          type: RuntimeDefault   # https://kubernetes.io/docs/tutorials/security/seccomp/
         runAsUser: 1221           # using a non privileged user
         runAsGroup: 1221          # using the group 'gouser' created in Dockerfile
         fsGroup: 100             # by adding fsGroup field, all processes of the container are also part
