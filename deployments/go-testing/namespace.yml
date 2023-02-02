@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: go-testing
+  labels:
+    env: test
+    app: goeland
+    # https://kubernetes.io/docs/concepts/security/pod-security-admission/
+    # The per-mode level label indicates which policy level to apply for the mode.
+    # MODE must be one of `enforce`, `audit`, or `warn`.
+    # LEVEL must be one of `privileged`, `baseline`, or `restricted`.
+    # pod-security.kubernetes.io/<MODE>: <LEVEL>
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-resources
+  namespace: go-testing
+  labels:
+    app: go-cloud-k8s-shell
+spec:
+  ### ADAPT the values above to your need remember that you m
+  hard:
+    requests.cpu: "8"
+    requests.memory: 8Gi
+    limits.cpu: "16"
+    limits.memory: 16Gi
+---
+## https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/memory-default-namespace/
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: mem-limit-range
+  namespace: go-testing
+spec:
+  limits:
+    - default:
+        memory: 512Mi
+      defaultRequest:
+        memory: 256Mi
+      type: Container
+---
+## https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/cpu-default-namespace/
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-limit-range
+  namespace: go-testing
+spec:
+  limits:
+    - default:
+        cpu: 1
+      defaultRequest:
+        cpu: 0.5
+      type: Container

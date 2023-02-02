@@ -1,2 +1,2 @@
 #!/bin/bash
-trivy k8s --report summary cluster
+trivy k8s --severity MEDIUM,HIGH,CRITICAL --report summary cluster
