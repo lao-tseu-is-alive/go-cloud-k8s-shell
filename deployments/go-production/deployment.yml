@@ -103,6 +103,8 @@ spec:
       labels:                    # The labels that will be applied to all the pods in this deployment
         app: go-cloud-k8s-shell
     spec:                        # Spec for the Pod base config, securityContext can be overridden in container
+      nodeSelector:
+        node-type: worker
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
         seccompProfile:
           type: RuntimeDefault   # https://kubernetes.io/docs/tutorials/security/seccomp/
@@ -127,6 +129,10 @@ spec:
           readOnlyRootFilesystem: true
         ports:
           - containerPort: 9999  # Should match the PORT env variable above  that the Go application listens on
+        volumeMounts:
+        - name: vol-data
+          mountPath: /mnt/data
+          subPath: data
         resources:
           limits:            # resource limit imposed to the pod, the container cannot utilize more res than specified
             cpu: 1000m       # 1000 millicpu or millicores 1 or 100% of a CPU core of a running node
@@ -172,3 +178,9 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.serviceAccountName
+      volumes:
+        - name: vol-data
+          persistentVolumeClaim:
+            claimName: longhorn-go-cloud-k8s-shell-pvc
+
+

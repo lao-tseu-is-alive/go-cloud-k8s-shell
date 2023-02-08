@@ -162,6 +162,8 @@ spec:
       labels:                    # The labels that will be applied to all the pods in this deployment
         app: APP_NAME
     spec:                        # Spec for the Pod base config, securityContext can be overridden in container
+      nodeSelector:
+        node-type: worker
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
         seccompProfile:
           type: RuntimeDefault   # https://kubernetes.io/docs/tutorials/security/seccomp/
