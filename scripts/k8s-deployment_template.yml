@@ -145,6 +145,20 @@ spec:
   selector:
     app: APP_NAME         # Map any pod with this label `app=APP_NAME` to this service
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+# https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+metadata:
+  name: longhorn-go-cloud-k8s-shell-pvc-read-write-many
+  namespace: go-testing
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+---
 apiVersion: apps/v1
 kind: Deployment                 # Type of Kubernetes resource
 metadata:
@@ -188,6 +202,10 @@ spec:
           readOnlyRootFilesystem: true
         ports:
           - containerPort: 9999  # Should match the PORT env variable above  that the Go application listens on
+        volumeMounts:
+        - name: vol-data
+          mountPath: /mnt/data
+          subPath: data
         resources:
           limits:            # resource limit imposed to the pod, the container cannot utilize more res than specified
             cpu: 1000m       # 1000 millicpu or millicores 1 or 100% of a CPU core of a running node
@@ -233,3 +251,9 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.serviceAccountName
+      volumes:
+        - name: vol-data
+          persistentVolumeClaim:
+            claimName: longhorn-go-cloud-k8s-shell-pvc-read-write-many
+
+
