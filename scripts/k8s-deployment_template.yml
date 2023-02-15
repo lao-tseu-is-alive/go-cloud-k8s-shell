@@ -118,6 +118,8 @@ roleRef:
   name: service-reader-role
   apiGroup: rbac.authorization.k8s.io
 ---
+## with this service you can connect from another pod with
+## curl http://APP_NAME-service.go-testing:9999
 apiVersion: v1
 kind: Service                    # Type of kubernetes resource
 metadata:

@@ -13,17 +13,17 @@ else
   exit 1
 fi
 echo "## APP: ${APP_NAME}, version: ${APP_VERSION} detected in file server.go"
-if [ "$(git diff --exit-code)" ]; then
-  echo "## 💥💥 ERROR: \"${APP_NAME} source tree is DIRTY YOU MUST commit your code before doing a tag ${APP_VERSION} !\""
-  git status
-else
+if output=$(git status --porcelain) && [ -z "$output" ]; then
   if [ $(git tag -l "v$APP_VERSION") ]; then
     echo "## 💥💥 ERROR: \"${APP_NAME} tag ${APP_VERSION} \" already exist !"
   else
-    echo "## ✓🚀 OK: ${APP_NAME} tag ${APP_VERSION}  was not found ! So let's add it..."
+    echo "## ✓🚀 OK: ${APP_NAME} tag ${APP_VERSION}  was not found ! So let's add this tag..."
     git tag "v$APP_VERSION" -m "v$APP_VERSION bump"
     git push origin --tags
   fi
+else
+  echo "## 💥💥 ERROR: \"${APP_NAME} source tree is DIRTY YOU MUST commit your code before doing a tag ${APP_VERSION} !\""
+  git status
 fi
 
 
