@@ -1,5 +1,5 @@
 # Start from the latest golang base image
-FROM golang:1-alpine3.16 as builder
+FROM golang:1-alpine3.17 as builder
 
 # Add Maintainer Info
 LABEL maintainer="cgil"
@@ -31,10 +31,11 @@ FROM ubuntu:22.04
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
 # https://docs.docker.com/engine/reference/builder/#user
 
-RUN apt-get update && apt-get install -y iproute2 nmap curl jq iputils-ping dnsutils && apt-get -y upgrade
+RUN apt-get update && apt-get install -y iproute2 nmap postgresql-client curl jq iputils-ping dnsutils && apt-get -y upgrade
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 1221 gouser
 WORKDIR /tmp
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+#RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+RUN curl -LO "https://dl.k8s.io/release/v1.27.1/bin/linux/amd64/kubectl"
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 WORKDIR /home/gouser
 
@@ -43,15 +44,16 @@ COPY --from=builder /app/go-shell-server .
 COPY scripts/checkK8SApiInsideContainer.sh ./
 COPY scripts/getK8SApiFromUrl.sh ./
 COPY scripts/getServiceEndPointFromInsideContainer.sh ./
+COPY scripts/checkOtherPodConnectivityInsideContainer.sh ./
 
-
-RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh && chmod a+x ./getServiceEndPointFromInsideContainer.sh
+RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh && chmod a+x ./getServiceEndPointFromInsideContainer.sh &&  chmod a+x ./checkOtherPodConnectivityInsideContainer.sh
 
 # Switch to non-root user:
 USER gouser
-RUN echo $'source <(kubectl completion bash)\n\
+RUN echo 'source <(kubectl completion bash)\n\
 alias k=kubectl\n\
-source <(kubectl completion bash | sed ''s|__start_kubectl kubectl|__start_kubectl k|g'')\n\
+alias lsa="ls -al -tr"\n\
+complete -o default -F __start_kubectl k\n\
 APISERVER=https://kubernetes.default.svc \n\
 SERVICEACCOUNT=/var/run/secrets/kubernetes.io/serviceaccount \n\
 NAMESPACE=$(cat ${SERVICEACCOUNT}/namespace) \n\

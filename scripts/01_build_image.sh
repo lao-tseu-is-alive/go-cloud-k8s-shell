@@ -38,6 +38,7 @@ then
     echo "## Cool 🚀✓🚀 OK: ${IMAGE_FILTER}:${APP_VERSION} image was not found ! So let's try to build it..."
     TMP_Docker_Dir=$(mktemp -d)
     cp Dockerfile* "$TMP_Docker_Dir"
+    cp .trivyignore "$TMP_Docker_Dir"
     cd "$TMP_Docker_Dir" || exit
     if trivy config --exit-code 1 --severity MEDIUM,HIGH,CRITICAL . ;
     #if [ $? -eq 0 ]
