@@ -72,52 +72,54 @@ echo "## Checking result of substitution in image name :"
 yq  ".spec.template.spec.containers[0].image" "${DEPLOYMENT_DIRECTORY}"/${K8S_DEPLOYMENT}
 #yq -i ".spec.template.spec.containers[0].image=\"${IMAGE_FILTER}:${APP_VERSION}\"" deployments/dev/deployment.yml
 echo "## Checking for vulnerabilities with trivy"
-cd "${DEPLOYMENT_DIRECTORY}" || exit
-echo "## Checking for vulnerabilities in ${K8S_DEPLOYMENT}"
-if trivy config --exit-code 1 --severity MEDIUM,HIGH,CRITICAL . ;
+if trivy image --exit-code 1 --ignore-unfixed --severity MEDIUM,HIGH,CRITICAL "${IMAGE_FILTER}:v${APP_VERSION}";
 then
-  echo "## ✓ ☺ 🚀 OK: Cool no vulnerabilities was found in your ${DEPLOYMENT}"
-  cd "$OLDPWD" || exit
-  # https://kubernetes.io/docs/tasks/access-application-cluster/list-all-running-container-images/
-  # shellcheck disable=SC2021
-  K8S_PODS_IMAGES=$(kubectl get pods -n "${K8s_NAMESPACE}" -o jsonpath="{..image}" | tr -s '[[:space:]]' '\n'|sort | uniq)
-  if [[ $K8S_PODS_IMAGES =~ ${IMAGE_FILTER}:v${APP_VERSION} ]];
+  echo "## ✓ ☺ 🚀 OK: Cool no vulnerabilities was found in your kubernetes manifest ${DEPLOYMENT}"
+  cd "${DEPLOYMENT_DIRECTORY}" || exit
+  echo "## Checking for vulnerabilities in ${K8S_DEPLOYMENT}"
+  if trivy config --exit-code 1 --severity MEDIUM,HIGH,CRITICAL . ;
   then
-    echo "## 💥💥 ERROR: ${IMAGE_FILTER}:v${APP_VERSION} image was already deployed ! "
-     kubectl get pods -n "${K8s_NAMESPACE}" -l app="${APP_NAME}"
+    echo "## ✓ ☺ 🚀 OK: Cool no vulnerabilities was found in your kubernetes manifest ${DEPLOYMENT}"
+    cd "$OLDPWD" || exit
+    # https://kubernetes.io/docs/tasks/access-application-cluster/list-all-running-container-images/
+    # shellcheck disable=SC2021
+    K8S_PODS_IMAGES=$(kubectl get pods -n "${K8s_NAMESPACE}" -o jsonpath="{..image}" | tr -s '[[:space:]]' '\n'|sort | uniq)
+    if [[ $K8S_PODS_IMAGES =~ ${IMAGE_FILTER}:v${APP_VERSION} ]];
+    then
+      echo "## 💥💥 ERROR: ${IMAGE_FILTER}:v${APP_VERSION} image was already deployed ! "
+       kubectl get pods -n "${K8s_NAMESPACE}" -l app="${APP_NAME}"
+    fi
+    #K8S_APP=$(kubectl get deployments --namespace=${K8s_NAMESPACE}" -o json |jq '.items[]?.spec.template.spec.containers[]?.image')
+    echo "## Deploying ${K8S_DEPLOYMENT} in the K8S cluster in namespace ${K8s_NAMESPACE}"
+    kubectl apply -f "${DEPLOYMENT_DIRECTORY}"/${K8S_DEPLOYMENT} --namespace="${K8s_NAMESPACE}"
+    # Check deployment rollout status every 5 seconds (max 1 minutes) until complete.
+    ATTEMPTS=0
+    ROLLOUT_STATUS_CMD="kubectl rollout status deployment ${APP_NAME} --namespace=${K8s_NAMESPACE}"
+    until $ROLLOUT_STATUS_CMD || [ $ATTEMPTS -eq 12 ]; do
+      echo "## doing rollout status attempt num: ${ATTEMPTS} ..."
+      $ROLLOUT_STATUS_CMD
+      ATTEMPTS=$((ATTEMPTS + 1))
+      sleep 5
+    done
+    echo "## Listing  pods in the cluster in namespace ${K8s_NAMESPACE}"
+    kubectl get pods -o wide --namespace="${K8s_NAMESPACE}"
+    echo "## Listing  services in the cluster "
+    kubectl get service -o wide --namespace="${K8s_NAMESPACE}"
+    sleep 2
+    echo "## Running a curl on your service at : http://go-info-server.rancher.localhost:8000"
+    curl -s http://go-info-server.rancher.localhost:8000 | jq
+    echo "## you can later remove this deployment by running :"
+    echo "kubectl delete -f ${DEPLOYMENT_DIRECTORY}/${K8S_DEPLOYMENT} --namespace=${K8s_NAMESPACE}"
+    echo "## in case you have a pending in external ip for the get service it may be because a old daemonset is stil "
+    echo "## check if there isn't an old daemonsets  with : kubectl  -n kube-system get daemonsets.apps "
+    echo "## https://rancher.com/docs/k3s/latest/en/networking/#how-the-service-lb-works"
+    # echo "Pods are allocated a private IP address by default and cannot be reached outside of the cluster unless you have a corresponding service."
+    # echo "You can also use the kubectl port-forward command to map a local port to a port inside the pod like this : (ctrl+c to terminate)"
+    # kubectl port-forward go-info-server-766947b78b-64f7j 8080:8080
+  else
+    echo "## You must correct the vulnerabilities detected by Trivy in your kubernetes manifest ${DEPLOYMENT}" >&2
   fi
-  #K8S_APP=$(kubectl get deployments --namespace=${K8s_NAMESPACE}" -o json |jq '.items[]?.spec.template.spec.containers[]?.image')
-  echo "## Deploying ${K8S_DEPLOYMENT} in the K8S cluster in namespace ${K8s_NAMESPACE}"
-  kubectl apply -f "${DEPLOYMENT_DIRECTORY}"/${K8S_DEPLOYMENT} --namespace="${K8s_NAMESPACE}"
-  # Check deployment rollout status every 5 seconds (max 1 minutes) until complete.
-  ATTEMPTS=0
-  ROLLOUT_STATUS_CMD="kubectl rollout status deployment ${APP_NAME} --namespace=${K8s_NAMESPACE}"
-  until $ROLLOUT_STATUS_CMD || [ $ATTEMPTS -eq 12 ]; do
-    echo "## doing rollout status attempt num: ${ATTEMPTS} ..."
-    $ROLLOUT_STATUS_CMD
-    ATTEMPTS=$((ATTEMPTS + 1))
-    sleep 5
-  done
-  echo "## Listing  pods in the cluster in namespace ${K8s_NAMESPACE}"
-  kubectl get pods -o wide --namespace="${K8s_NAMESPACE}"
-  echo "## Listing  services in the cluster "
-  kubectl get service -o wide --namespace="${K8s_NAMESPACE}"
-  #echo "## Listing  ingress in the cluster "
-  #kubectl get ingress -o wide
-  sleep 2
-  #echo "## Running a curl on new service at cluster http://localhost:8000"
-  #curl http://localhost:8000 | jq
-  echo "## Running a curl on your service at : http://go-info-server.rancher.localhost:8000"
-  curl -s http://go-info-server.rancher.localhost:8000 | jq
-  echo "## you can later remove this deployment by running :"
-  echo "kubectl delete -f ${DEPLOYMENT_DIRECTORY}/${K8S_DEPLOYMENT} --namespace=${K8s_NAMESPACE}"
-  echo "## in case you have a pending in external ip for the get service it may be because a old daemonset is stil "
-  echo "## check if there isn't an old daemonsets  with : kubectl  -n kube-system get daemonsets.apps "
-  echo "## https://rancher.com/docs/k3s/latest/en/networking/#how-the-service-lb-works"
-  # echo "Pods are allocated a private IP address by default and cannot be reached outside of the cluster unless you have a corresponding service."
-  # echo "You can also use the kubectl port-forward command to map a local port to a port inside the pod like this : (ctrl+c to terminate)"
-  # kubectl port-forward go-info-server-766947b78b-64f7j 8080:8080
 else
-  echo "## You must correct the MEDIUM,HIGH,CRITICAL vulnerabilities detected by Trivy, before building your DockerFile" >&2
+  echo "## You must correct the MEDIUM,HIGH,CRITICAL vulnerabilities detected by Trivy in your image ${IMAGE_FILTER}:v${APP_VERSION}" >&2
 fi
 
