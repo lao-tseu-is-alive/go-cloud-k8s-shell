@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 # https://kubernetes.io/docs/concepts/storage/persistent-volumes/
 metadata:
-  name: longhorn-go-cloud-k8s-shell-pvc-read-write-many
+  name: go-cloud-k8s-shell-pvc
   namespace: go-testing
 spec:
   accessModes:
@@ -10,4 +10,4 @@ spec:
   storageClassName: longhorn
   resources:
     requests:
-      storage: 10Gi
+      storage: 256Mi
