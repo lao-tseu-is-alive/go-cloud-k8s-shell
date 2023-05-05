@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -25,7 +24,7 @@ import (
 )
 
 const (
-	VERSION                = "0.1.14"
+	VERSION                = "0.1.15"
 	APP                    = "go-cloud-k8s-shell"
 	defaultProtocol        = "http"
 	defaultPort            = 9999
@@ -102,7 +101,7 @@ type K8sInfo struct {
 
 func GetOsUptime() (string, error) {
 	uptimeResult := defaultUnknown
-	content, err := ioutil.ReadFile("/proc/uptime")
+	content, err := os.ReadFile("/proc/uptime")
 	if err != nil {
 		return uptimeResult, err
 	}
@@ -321,14 +320,19 @@ func GetJsonFromUrl(url string, token string, caCert []byte, logger *log.Logger)
 		logger.Println("Error on response.\n[ERROR] -", err)
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			logger.Println("Error on Body.Close().\n[ERROR] -", err)
+		}
+	}(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logger.Println("Error while reading the response bytes:", err)
 		return "", err
 	}
-	return string([]byte(body)), nil
+	return string(body), nil
 }
 
 func getHtmlHeader(title string) string {
@@ -448,7 +452,7 @@ func (s *GoHttpServer) StartServer() {
 
 }
 
-func (s *GoHttpServer) jsonResponse(w http.ResponseWriter, r *http.Request, result interface{}) {
+func (s *GoHttpServer) jsonResponse(w http.ResponseWriter, result interface{}) {
 	body, err := json.Marshal(result)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -456,11 +460,19 @@ func (s *GoHttpServer) jsonResponse(w http.ResponseWriter, r *http.Request, resu
 		return
 	}
 	var prettyOutput bytes.Buffer
-	json.Indent(&prettyOutput, body, "", "  ")
+	err = json.Indent(&prettyOutput, body, "", "  ")
+	if err != nil {
+		s.logger.Printf("ERROR: 'JSON Indent failed. Error: %v'", err)
+		return
+	}
 	w.Header().Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
-	w.Write(prettyOutput.Bytes())
+	_, err = w.Write(prettyOutput.Bytes())
+	if err != nil {
+		s.logger.Printf("ERROR: 'w.Write failed. Error: %v'", err)
+		return
+	}
 }
 
 //############# BEGIN HANDLERS
@@ -580,7 +592,7 @@ func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
 				}
 				data.UptimeOs = uptimeOS
 				data.RequestId = guid.String()
-				s.jsonResponse(w, r, data)
+				s.jsonResponse(w, data)
 				/*n, err := fmt.Fprintf(w, getHtmlPage(defaultMessage))
 				if err != nil {
 					s.logger.Printf("💥💥 ERROR: [%s] was unable to Fprintf. path:'%s', from IP: [%s], send_bytes:%d'\n", handlerName, requestedUrlPath, remoteIp, n)
@@ -612,7 +624,11 @@ func (s *GoHttpServer) getTimeHandler() http.HandlerFunc {
 			now := time.Now()
 			w.Header().Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "{\"time\":\"%s\"}", now.Format(time.RFC3339))
+			_, err := fmt.Fprintf(w, "{\"time\":\"%s\"}", now.Format(time.RFC3339))
+			if err != nil {
+				s.logger.Printf("Error doing fmt.Fprintf err: %s", err)
+				return
+			}
 		} else {
 			s.logger.Printf(formatErrRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
 			http.Error(w, httpErrMethodNotAllow, http.StatusMethodNotAllowed)
@@ -629,7 +645,11 @@ func (s *GoHttpServer) getWaitHandler(secondsToSleep int) http.HandlerFunc {
 			w.Header().Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
 			time.Sleep(durationOfSleep) // simulate a delay to be ready
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "{\"waited\":\"%v seconds\"}", secondsToSleep)
+			_, err := fmt.Fprintf(w, "{\"waited\":\"%v seconds\"}", secondsToSleep)
+			if err != nil {
+				s.logger.Printf("Error doing fmt.Fprintf err: %s", err)
+				return
+			}
 		} else {
 			s.logger.Printf(formatErrRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
 			http.Error(w, httpErrMethodNotAllow, http.StatusMethodNotAllowed)

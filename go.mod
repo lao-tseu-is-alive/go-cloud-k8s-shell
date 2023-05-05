@@ -3,8 +3,8 @@ module github.com/lao-tseu-is-alive/go-cloud-k8s-shell
 go 1.19
 
 require (
-	github.com/rs/xid v1.4.0
-	github.com/stretchr/testify v1.8.0
+	github.com/rs/xid v1.5.0
+	github.com/stretchr/testify v1.8.2
 )
 
 require (
