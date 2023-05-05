@@ -32,7 +32,7 @@ FROM ubuntu:22.04
 # https://docs.docker.com/engine/reference/builder/#user
 
 RUN apt-get update && apt-get install -y iproute2 nmap postgresql-client curl jq iputils-ping dnsutils && apt-get -y upgrade
-RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 1221 gouser
+RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser
 WORKDIR /tmp
 #RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 RUN curl -LO "https://dl.k8s.io/release/v1.27.1/bin/linux/amd64/kubectl"

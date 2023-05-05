@@ -54,9 +54,9 @@ metadata:
 spec:
   limits:
     - default:
-        cpu: 1
+        cpu: "1"
       defaultRequest:
-        cpu: 0.5
+        cpu: "0.5"
       type: Container
 ---
 apiVersion: v1
@@ -108,8 +108,8 @@ spec:
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
         seccompProfile:
           type: RuntimeDefault   # https://kubernetes.io/docs/tutorials/security/seccomp/
-        runAsUser: 1221           # using a non privileged user
-        runAsGroup: 1221          # using the group 'gouser' created in Dockerfile
+        runAsUser: 12221           # using a non privileged user
+        runAsGroup: 12221          # using the group 'gouser' created in Dockerfile
         fsGroup: 100             # by adding fsGroup field, all processes of the container are also part
                                  # of the supplementary group ID 100 (users).
         supplementalGroups:
@@ -121,8 +121,8 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
-          runAsUser: 1221           # using the user 'gouser' created in Dockerfile
-          runAsGroup: 1221          # using the group 'gouser' created in Dockerfile
+          runAsUser: 12221           # using the user 'gouser' created in Dockerfile
+          runAsGroup: 12221          # using the group 'gouser' created in Dockerfile
           capabilities:
             drop:
               - 'ALL'
