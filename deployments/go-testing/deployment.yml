@@ -1,7 +1,7 @@
 ---
 ### TEMPLATE FOR A SERVICE AND DEPLOYMENT ON KUBERNETES just substitute the next keywords with your own values
 ### go-cloud-k8s-shell     : the name of your application or container image
-### v0.1.14  : the version of the app image to deploy
+### v0.1.16  : the version of the app image to deploy
 ### ghcr.io/lao-tseu-is-alive  : the prefix to your images in your container registry
 apiVersion: v1
 kind: Namespace
@@ -173,8 +173,8 @@ spec:
     spec:                        # Spec for the Pod base config, securityContext can be overridden in container
       # kubectl label nodes gok8sw01.lausanne.ch kubernetes.io/role=worker
       # comment the two next lines if you do not have worker nodes (rancher-desktop)
-      nodeSelector:
-        node-type: worker
+      #nodeSelector:
+      #  node-type: worker
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
         seccompProfile:
           type: RuntimeDefault   # https://kubernetes.io/docs/tutorials/security/seccomp/
@@ -186,7 +186,7 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.14
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.16
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
@@ -251,5 +251,5 @@ spec:
       volumes:
         - name: vol-data
           persistentVolumeClaim:
-            claimName: go-cloud-k8s-shell-pvc
+            claimName: go-cloud-k8s-shell-pvc-read-write-once
 
