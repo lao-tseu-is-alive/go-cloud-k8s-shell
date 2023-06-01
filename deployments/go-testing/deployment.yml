@@ -179,7 +179,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault   # https://kubernetes.io/docs/tutorials/security/seccomp/
         runAsUser: 12221           # using a non privileged user
-        runAsGroup: 12221          # using the group 'gouser' created in Dockerfile
+        runAsGroup: 12221          # using the group 'gouser' as in Dockerfile
         fsGroup: 100             # by adding fsGroup field, all processes of the container are also part
                                  # of the supplementary group ID 100 (users).
         supplementalGroups:

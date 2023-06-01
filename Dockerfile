@@ -31,11 +31,11 @@ FROM ubuntu:kinetic
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
 # https://docs.docker.com/engine/reference/builder/#user
 
-RUN apt-get update && apt-get install -y iproute2 nmap postgresql-client curl jq iputils-ping dnsutils && apt-get -y upgrade
+RUN apt-get update && apt-get install -y iproute2 nmap postgresql-client curl jq iputils-ping dnsutils wget && apt-get -y upgrade
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser
 WORKDIR /tmp
 #RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-RUN curl -LO "https://dl.k8s.io/release/v1.27.1/bin/linux/amd64/kubectl"
+RUN curl -LO "https://dl.k8s.io/release/v1.27.2/bin/linux/amd64/kubectl"
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 WORKDIR /home/gouser
 

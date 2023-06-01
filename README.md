@@ -25,3 +25,10 @@ you can also run :
     ./getServiceEndPointFromInsideContainer.sh
 
 this script gives an example of service discovery using the kubernetes api
+
+
+### More info :
+
++ [Checkov is a static code analysis tool for scanning infrastructure as code (IaC)](https://www.checkov.io/1.Welcome/What%20is%20Checkov.html)
++ [Kube-bench](https://github.com/aquasecurity/kube-bench/blob/main/docs/installation.md)
++ [Falco runtime security for hosts, containers, Kubernetes and the cloud.](https://falco.org/)
