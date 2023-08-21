@@ -185,8 +185,10 @@ spec:
       labels:                    # The labels that will be applied to all the pods in this deployment
         app: APP_NAME
     spec:                        # Spec for the Pod base config, securityContext can be overridden in container
-      nodeSelector:
-        node-type: worker
+      # kubectl label nodes gok8sw01.lausanne.ch kubernetes.io/role=worker
+      # comment the two next lines if you do not have worker nodes (rancher-desktop)
+      #nodeSelector:
+      #  node-type: worker
       securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
         seccompProfile:
           type: RuntimeDefault   # https://kubernetes.io/docs/tutorials/security/seccomp/
@@ -201,6 +203,8 @@ spec:
         image: GO_CONTAINER_REGISTRY_PREFIX/APP_NAME:APP_VERSION
         imagePullPolicy: Always
         securityContext:
+          seccompProfile:
+            type: RuntimeDefault
           allowPrivilegeEscalation: false
           runAsNonRoot: true
           runAsUser: 12221           # using the user 'gouser' created in Dockerfile
@@ -263,6 +267,5 @@ spec:
       volumes:
         - name: vol-data
           persistentVolumeClaim:
-            claimName: longhorn-go-cloud-k8s-shell-pvc-read-write-many
-
+            claimName: go-cloud-k8s-shell-pvc-read-write-once
 
