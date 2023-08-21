@@ -1,1 +1,4 @@
+#bug(misconf): False positives for ksv116 and ksv104
+#https://github.com/aquasecurity/trivy/issues/4922
+AVD-KSV-0116
 AVD-DS-0029

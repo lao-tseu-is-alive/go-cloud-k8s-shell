@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y iproute2 nmap postgresql-client curl jq
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser
 WORKDIR /tmp
 #RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-RUN curl -LO "https://dl.k8s.io/release/v1.27.2/bin/linux/amd64/kubectl"
+RUN curl -LO "https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl"
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 WORKDIR /home/gouser
 
@@ -64,6 +64,10 @@ export CACERT TOKEN NAMESPACE SERVICEACCOUNT APISERVER' >> ~/.bashrc
 
 # Expose port 9999 to the outside world, go-shell-server will use the env PORT as listening port or 9999 as default
 EXPOSE 9999
+
+# how to check if container is ok https://docs.docker.com/engine/reference/builder/#healthcheck
+HEALTHCHECK --start-period=5s --interval=30s --timeout=3s \
+    CMD curl --fail http://localhost:9999/health || exit 1
 
 # Command to run the executable
 CMD ["./go-shell-server"]

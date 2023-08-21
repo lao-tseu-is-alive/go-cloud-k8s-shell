@@ -68,6 +68,7 @@ metadata:
   name: pod-reader-role
   labels:
     app: go-cloud-k8s-shell
+
 rules:
   - apiGroups: [""]  # "" indicates the core API group
     resources: ["pods", "namespaces"]
@@ -186,9 +187,11 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.16
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.18
         imagePullPolicy: Always
         securityContext:
+          seccompProfile:
+            type: RuntimeDefault
           allowPrivilegeEscalation: false
           runAsNonRoot: true
           runAsUser: 12221           # using the user 'gouser' created in Dockerfile
