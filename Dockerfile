@@ -24,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o go-shell-server .
 
 
 ######## Start a new stage  #######
-FROM ubuntu:23.04
+FROM ubuntu:mantic-20231011
 # to comply with security best practices
 # Running containers with 'root' user can lead to a container escape situation (the default with Docker...).
 # It is a best practice to run containers as non-root users
