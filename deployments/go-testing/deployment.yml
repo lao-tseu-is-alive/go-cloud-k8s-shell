@@ -162,7 +162,7 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 1
+      maxUnavailable: 0
       maxSurge: 2               # maximum number of pods that can be scheduled above the desired number of pods.
   selector:
     matchLabels:
@@ -187,7 +187,7 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.18
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.20
         imagePullPolicy: Always
         securityContext:
           seccompProfile:
@@ -254,5 +254,5 @@ spec:
       volumes:
         - name: vol-data
           persistentVolumeClaim:
-            claimName: go-cloud-k8s-shell-pvc-read-write-once
+            claimName: go-cloud-k8s-shell-pvc
 
