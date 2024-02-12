@@ -6,7 +6,7 @@
 [![cve-trivy-scan](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/cve-trivy-scan.yml/badge.svg)](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/cve-trivy-scan.yml)
 [![codecov](https://codecov.io/gh/lao-tseu-is-alive/go-cloud-k8s-shell/branch/main/graph/badge.svg)](https://codecov.io/gh/lao-tseu-is-alive/go-cloud-k8s-shell)
 
-A simple Golang microservice with basic tools to make some tests inside a k8s cluster
+A simple Golang microservice with some essential command line  tools to make some tests inside a k8s cluster
 
 ### some things to try inside a shell for this container:
  
