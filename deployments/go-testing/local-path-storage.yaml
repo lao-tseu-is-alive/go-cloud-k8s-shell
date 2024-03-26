@@ -13,6 +13,17 @@ metadata:
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: local-path-provisioner-role
+  namespace: local-path-storage
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: local-path-provisioner-role
@@ -22,13 +33,28 @@ rules:
     verbs: [ "get", "list", "watch" ]
   - apiGroups: [ "" ]
     resources: [ "endpoints", "persistentvolumes", "pods" ]
-    verbs: [ "*" ]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [ "" ]
     resources: [ "events" ]
     verbs: [ "create", "patch" ]
   - apiGroups: [ "storage.k8s.io" ]
     resources: [ "storageclasses" ]
     verbs: [ "get", "list", "watch" ]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: local-path-provisioner-bind
+  namespace: local-path-storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: local-path-provisioner-role
+subjects:
+  - kind: ServiceAccount
+    name: local-path-provisioner-service-account
+    namespace: local-path-storage
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -61,9 +87,10 @@ spec:
         app: local-path-provisioner
     spec:
       serviceAccountName: local-path-provisioner-service-account
+#      automountServiceAccountToken: false
       containers:
         - name: local-path-provisioner
-          image: rancher/local-path-provisioner:v0.0.24
+          image: rancher/local-path-provisioner:v0.0.26
           imagePullPolicy: IfNotPresent
           command:
             - local-path-provisioner
@@ -79,6 +106,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+              ephemeral-storage: "2Gi"
       volumes:
         - name: config-volume
           configMap:
@@ -123,6 +155,11 @@ data:
     metadata:
       name: helper-pod
     spec:
+      priorityClassName: system-node-critical
+      tolerations:
+        - key: node.kubernetes.io/disk-pressure
+          operator: Exists
+          effect: NoSchedule
       containers:
       - name: helper-pod
         image: busybox
