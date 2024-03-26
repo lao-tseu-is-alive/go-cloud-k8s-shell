@@ -108,7 +108,7 @@ spec:
                   fieldPath: metadata.namespace
           resources:
             limits:
-              cpu: "1"
+              cpu: "2"
               memory: 512Mi
               ephemeral-storage: "2Gi"
       volumes:
