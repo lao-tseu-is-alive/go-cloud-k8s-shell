@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -24,33 +23,6 @@ const (
 	fmtGotErrInBody                 = "### GOT ERROR : %s\n%s"
 	fmtPrintTestUrlMethod           = "### %s : %s on %s\n"
 	respShouldBeWatExpected         = "Response should contain what was expected."
-	expectedJsonString              = `{
-  "hostname": "pulsar2021",
-  "pid": 1,
-  "ppid": 0,
-  "uid": 1000,
-  "appname": "go-info-server",
-  "version": "0.3.0",
-  "param_name": "_NO_PARAMETER_NAME_",
-  "remote_addr": "127.0.0.1:56670",
-  "goos": "linux",
-  "goarch": "amd64",
-  "runtime": "go1.18.3",
-  "num_goroutine": "1",
-  "num_cpu": "4",
-  "env_vars": [
-    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-    "HOME=/home/gouser"
-  ],
-  "headers": {
-    "Accept": [
-      "*/*"
-    ],
-    "User-Agent": [
-      "curl/7.68.0"
-    ]
-  }
-}`
 )
 
 type testStruct struct {
@@ -184,7 +156,7 @@ func TestGoHttpServerMyDefaultHandler(t *testing.T) {
 	if DEBUG {
 		l = log.New(os.Stdout, fmt.Sprintf("HTTP_SERVER_%s ", APP), log.Ldate|log.Ltime|log.Lshortfile)
 	} else {
-		l = log.New(ioutil.Discard, APP, 0)
+		l = log.New(io.Discard, APP, 0)
 	}
 
 	myServer := NewGoHttpServer(listenAddr, l)
@@ -254,7 +226,7 @@ func TestGoHttpServerMyDefaultHandler(t *testing.T) {
 				t.Fatal(err)
 			}
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
-			receivedJson, _ := ioutil.ReadAll(resp.Body)
+			receivedJson, _ := io.ReadAll(resp.Body)
 			rInfo := &RuntimeInfo{}
 			if DEBUG {
 				fmt.Println("param name : % v", nameParameter)
@@ -271,7 +243,7 @@ func TestGoHttpServerMyDefaultHandler(t *testing.T) {
 }
 
 func TestGoHttpServerReadinessHandler(t *testing.T) {
-	myServer := NewGoHttpServer(fmt.Sprintf(":%d", defaultPort), log.New(ioutil.Discard, APP, 0))
+	myServer := NewGoHttpServer(fmt.Sprintf(":%d", defaultPort), log.New(io.Discard, APP, 0))
 	ts := httptest.NewServer(myServer.getReadinessHandler())
 	defer ts.Close()
 
@@ -313,7 +285,7 @@ func TestGoHttpServerReadinessHandler(t *testing.T) {
 				t.Fatal(err)
 			}
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
-			receivedJson, _ := ioutil.ReadAll(resp.Body)
+			receivedJson, _ := io.ReadAll(resp.Body)
 
 			printWantedReceived(tt, receivedJson)
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
@@ -330,7 +302,7 @@ func printWantedReceived(tt testStruct, receivedJson []byte) {
 }
 
 func TestGoHttpServerHealthHandler(t *testing.T) {
-	myServer := NewGoHttpServer(fmt.Sprintf(":%d", defaultPort), log.New(ioutil.Discard, APP, 0))
+	myServer := NewGoHttpServer(fmt.Sprintf(":%d", defaultPort), log.New(io.Discard, APP, 0))
 	ts := httptest.NewServer(myServer.getHealthHandler())
 	defer ts.Close()
 
@@ -372,7 +344,7 @@ func TestGoHttpServerHealthHandler(t *testing.T) {
 				t.Fatal(err)
 			}
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
-			receivedJson, _ := ioutil.ReadAll(resp.Body)
+			receivedJson, _ := io.ReadAll(resp.Body)
 
 			printWantedReceived(tt, receivedJson)
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
@@ -382,7 +354,7 @@ func TestGoHttpServerHealthHandler(t *testing.T) {
 }
 
 func TestGoHttpServerTimeHandler(t *testing.T) {
-	myServer := NewGoHttpServer(fmt.Sprintf(":%d", defaultPort), log.New(ioutil.Discard, APP, 0))
+	myServer := NewGoHttpServer(fmt.Sprintf(":%d", defaultPort), log.New(io.Discard, APP, 0))
 	ts := httptest.NewServer(myServer.getTimeHandler())
 	defer ts.Close()
 	now := time.Now()
@@ -426,7 +398,7 @@ func TestGoHttpServerTimeHandler(t *testing.T) {
 				t.Fatal(err)
 			}
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
-			receivedJson, _ := ioutil.ReadAll(resp.Body)
+			receivedJson, _ := io.ReadAll(resp.Body)
 
 			printWantedReceived(tt, receivedJson)
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
@@ -436,7 +408,7 @@ func TestGoHttpServerTimeHandler(t *testing.T) {
 }
 
 func TestGoHttpServerWaitHandler(t *testing.T) {
-	myServer := NewGoHttpServer(fmt.Sprintf(":%d", defaultPort), log.New(ioutil.Discard, APP, 0))
+	myServer := NewGoHttpServer(fmt.Sprintf(":%d", defaultPort), log.New(io.Discard, APP, 0))
 	ts := httptest.NewServer(myServer.getWaitHandler(1))
 	defer ts.Close()
 	expectedResult := fmt.Sprintf("{\"waited\":\"%v seconds\"}", 1)
@@ -479,7 +451,7 @@ func TestGoHttpServerWaitHandler(t *testing.T) {
 				t.Fatal(err)
 			}
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
-			receivedJson, _ := ioutil.ReadAll(resp.Body)
+			receivedJson, _ := io.ReadAll(resp.Body)
 
 			printWantedReceived(tt, receivedJson)
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
