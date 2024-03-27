@@ -103,7 +103,7 @@ func TestGetPortFromEnv(t *testing.T) {
 				defaultPort: defaultPort,
 			},
 			envPORT:       "",
-			want:          ":9999",
+			want:          ":9898",
 			wantErr:       false,
 			wantErrPrefix: "",
 		},

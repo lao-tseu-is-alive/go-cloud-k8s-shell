@@ -27,7 +27,7 @@ const (
 	VERSION                = "0.1.22"
 	APP                    = "go-cloud-k8s-shell"
 	defaultProtocol        = "http"
-	defaultPort            = 9999
+	defaultPort            = 9898
 	defaultServerIp        = ""
 	defaultServerPath      = "/"
 	defaultSecondsToSleep  = 3
