@@ -127,23 +127,18 @@ func GetOsInfo() (*OsInfo, ErrorConfig) {
 		}
 	}
 	r := regexp.MustCompile(regexFindOsNameVersion)
-	// fmt.Printf("Found matches : %v\n", r.MatchString(string(content)))
-	if r.MatchString(string(content)) {
-		res := r.FindAllStringSubmatch(string(content), -1)
-		for i, v := range res {
-			// fmt.Printf("res[%d] : %+#v\n", i, v)
-			for j, key := range r.SubexpNames() {
-				if j > 0 && i <= len(res) && len(v[j]) > 0 {
-					// fmt.Printf("name :'%s' : %+#v\n", key, v[j])
-					if key == "name" {
-						info.Name = v[j]
-					}
-					if key == "version" {
-						info.Version = v[j]
-					}
-					if key == "versid" {
-						info.VersionId = v[j]
-					}
+	matches := r.FindAllStringSubmatch(string(content), -1)
+
+	for _, match := range matches {
+		for i, name := range r.SubexpNames() {
+			if i > 0 && match[i] != "" {
+				switch name {
+				case "name":
+					info.Name = match[i]
+				case "version":
+					info.Version = match[i]
+				case "versid":
+					info.VersionId = match[i]
 				}
 			}
 		}
