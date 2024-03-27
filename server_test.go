@@ -22,6 +22,8 @@ const (
 	assertCorrectStatusCodeExpected = "expected status code should be returned"
 	fmtErrNewRequest                = "### ERROR http.NewRequest %s on [%s] error is :%v\n"
 	fmtGotErrInBody                 = "### GOT ERROR : %s\n%s"
+	fmtPrintTestUrlMethod           = "### %s : %s on %s\n"
+	respShouldBeWatExpected         = "Response should contain what was expected."
 	expectedJsonString              = `{
   "hostname": "pulsar2021",
   "pid": 1,
@@ -244,7 +246,7 @@ func TestGoHttpServerMyDefaultHandler(t *testing.T) {
 			}
 			resp, err := http.DefaultClient.Do(tt.r)
 			if DEBUG {
-				fmt.Printf("### %s : %s on %s\n", tt.name, tt.r.Method, tt.r.URL)
+				fmt.Printf(fmtPrintTestUrlMethod, tt.name, tt.r.Method, tt.r.URL)
 			}
 			defer resp.Body.Close()
 			if err != nil {
@@ -263,7 +265,7 @@ func TestGoHttpServerMyDefaultHandler(t *testing.T) {
 				assert.Nil(t, err, "the output should be a valid json")
 			}
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
-			assert.Contains(t, string(receivedJson), tt.wantBody, "Response should contain what was expected.")
+			assert.Contains(t, string(receivedJson), tt.wantBody, respShouldBeWatExpected)
 		})
 	}
 }
@@ -303,7 +305,7 @@ func TestGoHttpServerReadinessHandler(t *testing.T) {
 			tt.r.Header.Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
 			resp, err := http.DefaultClient.Do(tt.r)
 			if DEBUG {
-				fmt.Printf("### %s : %s on %s\n", tt.name, tt.r.Method, tt.r.URL)
+				fmt.Printf(fmtPrintTestUrlMethod, tt.name, tt.r.Method, tt.r.URL)
 			}
 			defer resp.Body.Close()
 			if err != nil {
@@ -315,7 +317,7 @@ func TestGoHttpServerReadinessHandler(t *testing.T) {
 
 			printWantedReceived(tt, receivedJson)
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
-			assert.Contains(t, string(receivedJson), tt.wantBody, "Response should contain what was expected.")
+			assert.Contains(t, string(receivedJson), tt.wantBody, respShouldBeWatExpected)
 		})
 	}
 }
@@ -362,7 +364,7 @@ func TestGoHttpServerHealthHandler(t *testing.T) {
 			tt.r.Header.Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
 			resp, err := http.DefaultClient.Do(tt.r)
 			if DEBUG {
-				fmt.Printf("### %s : %s on %s\n", tt.name, tt.r.Method, tt.r.URL)
+				fmt.Printf(fmtPrintTestUrlMethod, tt.name, tt.r.Method, tt.r.URL)
 			}
 			defer resp.Body.Close()
 			if err != nil {
@@ -374,7 +376,7 @@ func TestGoHttpServerHealthHandler(t *testing.T) {
 
 			printWantedReceived(tt, receivedJson)
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
-			assert.Contains(t, string(receivedJson), tt.wantBody, "Response should contain what was expected.")
+			assert.Contains(t, string(receivedJson), tt.wantBody, respShouldBeWatExpected)
 		})
 	}
 }
@@ -416,7 +418,7 @@ func TestGoHttpServerTimeHandler(t *testing.T) {
 			tt.r.Header.Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
 			resp, err := http.DefaultClient.Do(tt.r)
 			if DEBUG {
-				fmt.Printf("### %s : %s on %s\n", tt.name, tt.r.Method, tt.r.URL)
+				fmt.Printf(fmtPrintTestUrlMethod, tt.name, tt.r.Method, tt.r.URL)
 			}
 			defer resp.Body.Close()
 			if err != nil {
@@ -428,7 +430,7 @@ func TestGoHttpServerTimeHandler(t *testing.T) {
 
 			printWantedReceived(tt, receivedJson)
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
-			assert.Contains(t, string(receivedJson), tt.wantBody, "Response should contain what was expected.")
+			assert.Contains(t, string(receivedJson), tt.wantBody, respShouldBeWatExpected)
 		})
 	}
 }
@@ -469,7 +471,7 @@ func TestGoHttpServerWaitHandler(t *testing.T) {
 			tt.r.Header.Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
 			resp, err := http.DefaultClient.Do(tt.r)
 			if DEBUG {
-				fmt.Printf("### %s : %s on %s\n", tt.name, tt.r.Method, tt.r.URL)
+				fmt.Printf(fmtPrintTestUrlMethod, tt.name, tt.r.Method, tt.r.URL)
 			}
 			defer resp.Body.Close()
 			if err != nil {
@@ -481,7 +483,7 @@ func TestGoHttpServerWaitHandler(t *testing.T) {
 
 			printWantedReceived(tt, receivedJson)
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
-			assert.Contains(t, string(receivedJson), tt.wantBody, "Response should contain what was expected.")
+			assert.Contains(t, string(receivedJson), tt.wantBody, respShouldBeWatExpected)
 		})
 	}
 }
