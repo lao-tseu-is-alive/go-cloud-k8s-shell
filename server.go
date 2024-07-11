@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -24,7 +25,7 @@ import (
 )
 
 const (
-	VERSION                = "0.1.25"
+	VERSION                = "0.1.26"
 	APP                    = "go-cloud-k8s-shell"
 	defaultProtocol        = "http"
 	defaultPort            = 9898
@@ -436,7 +437,7 @@ func (s *GoHttpServer) StartServer() {
 	go func() {
 		s.logger.Printf("INFO: Starting http server listening at %s://%s/", defaultProtocol, s.listenAddress)
 		err := s.httpServer.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Fatalf("💥💥 ERROR: 'Could not listen on %q: %s'\n", s.listenAddress, err)
 		}
 	}()
@@ -497,39 +498,24 @@ func (s *GoHttpServer) getHealthHandler() http.HandlerFunc {
 	}
 }
 
-func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
-	handlerName := "getMyDefaultHandler"
-
-	s.logger.Printf(initCallMsg, handlerName)
-	hostName, err := os.Hostname()
-	if err != nil {
-		s.logger.Printf("💥💥 ERROR: 'os.Hostname() returned an error : %v'", err)
-		hostName = "#unknown#"
+func (s *GoHttpServer) handleOsInfoError(errConf ErrorConfig) {
+	var pathError *fs.PathError
+	switch {
+	case errors.As(errConf.err, &pathError):
+		s.logger.Printf("NOTICE: 'GetOsInfo() did not find os-release : %v'", errConf.err)
+	default:
+		s.logger.Printf("💥💥 ERROR: 'GetOsInfo() returned an error : %+#v'", errConf.err)
 	}
-
-	osReleaseInfo, errConf := GetOsInfo()
-
-	if errConf.err != nil {
-		switch errConf.err.(type) {
-		case *fs.PathError:
-			s.logger.Printf("NOTICE: 'GetOsInfo() dif not find os-release : %v'", errConf.err)
-		default:
-			s.logger.Printf("💥💥 ERROR: 'GetOsInfo() returned an error : %+#v'", errConf.err)
-		}
-	}
-	// fmt.Printf("%+v\n", osReleaseInfo)
-
-	uptimeOS, err := GetOsUptime()
-	if err != nil {
-		s.logger.Printf("💥💥 ERROR: 'GetOsUptime() returned an error : %+#v'", err)
-	}
+}
+func (s *GoHttpServer) getKubernetesInfo() (string, string, string) {
 	k8sVersion := ""
 	k8sCurrentNameSpace := ""
+	k8sUrl := ""
+
 	k8sUrl, err := GetKubernetesApiUrlFromEnv()
 	if err != nil {
 		s.logger.Printf("💥💥 ERROR: 'GetKubernetesApiUrlFromEnv() returned an error : %+#v'", err)
 	} else {
-		// here we can assume that we are inside a k8s container...
 		info, errConnInfo := GetKubernetesConnInfo(s.logger)
 		if errConnInfo.err != nil {
 			s.logger.Printf("💥💥 ERROR: 'GetKubernetesConnInfo() returned an error : %s : %+#v'", errConnInfo.msg, errConnInfo.err)
@@ -538,7 +524,29 @@ func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
 		k8sCurrentNameSpace = info.CurrentNamespace
 	}
 
-	data := RuntimeInfo{
+	return k8sUrl, k8sVersion, k8sCurrentNameSpace
+}
+
+func (s *GoHttpServer) collectRuntimeInfo() RuntimeInfo {
+	hostName, err := os.Hostname()
+	if err != nil {
+		s.logger.Printf("💥💥 ERROR: 'os.Hostname() returned an error : %v'", err)
+		hostName = "#unknown#"
+	}
+
+	osReleaseInfo, errConf := GetOsInfo()
+	if errConf.err != nil {
+		s.handleOsInfoError(errConf)
+	}
+
+	uptimeOS, err := GetOsUptime()
+	if err != nil {
+		s.logger.Printf("💥💥 ERROR: 'GetOsUptime() returned an error : %+#v'", err)
+	}
+
+	k8sApiUrl, k8sVersion, k8sCurrentNameSpace := s.getKubernetesInfo()
+
+	return RuntimeInfo{
 		Hostname:            hostName,
 		Pid:                 os.Getpid(),
 		PPid:                os.Getppid(),
@@ -558,12 +566,21 @@ func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
 		NumCPU:              strconv.FormatInt(int64(runtime.NumCPU()), 10),
 		Uptime:              fmt.Sprintf("%s", time.Since(s.startTime)),
 		UptimeOs:            uptimeOS,
-		K8sApiUrl:           k8sUrl,
+		K8sApiUrl:           k8sApiUrl,
 		K8sVersion:          k8sVersion,
 		K8sCurrentNamespace: k8sCurrentNameSpace,
 		EnvVars:             os.Environ(),
 		Headers:             map[string][]string{},
 	}
+}
+
+func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
+	handlerName := "getMyDefaultHandler"
+
+	s.logger.Printf(initCallMsg, handlerName)
+
+	data := s.collectRuntimeInfo()
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		remoteIp := r.RemoteAddr // ip address of the original request or the last proxy
 		requestedUrlPath := r.URL.Path
@@ -610,6 +627,7 @@ func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
 		}
 	}
 }
+
 func (s *GoHttpServer) getTimeHandler() http.HandlerFunc {
 	handlerName := "getTimeHandler"
 	s.logger.Printf(initCallMsg, handlerName)
