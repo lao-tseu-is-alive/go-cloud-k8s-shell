@@ -1,7 +1,6 @@
 ---
-### TEMPLATE FOR A SERVICE AND DEPLOYMENT ON KUBERNETES just substitute the next keywords with your own values
-### go-cloud-k8s-shell     : the name of your application or container image
-### v0.1.16  : the version of the app image to deploy
+### go-cloud-k8s-shell     : the name of the container image
+### v0.1.26  : the version of the app image to deploy
 ### ghcr.io/lao-tseu-is-alive  : the prefix to your images in your container registry
 apiVersion: v1
 kind: Namespace
@@ -139,9 +138,9 @@ spec:
   # By default k3s have a builtin load balancer called "klipper" https://github.com/k3s-io/klipper-lb ok for one dev node.
   # It is possible to run multiple Services on the same node, as long as they use different ports.
   # in case you are using a 'real' k3s cluster with multiple nodes consider using metalLB instead
-  externalTrafficPolicy: Local
-  loadBalancerSourceRanges:
-    - 192.168.0.0/16
+  #externalTrafficPolicy: Local
+  #loadBalancerSourceRanges:
+  #  - 192.168.0.0/16
   ports:                         # Take incoming HTTP requests on this port (exposed) and forward them to the targetPort of container
     - name: http
       port: 9999
@@ -188,7 +187,7 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.22
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.26
         imagePullPolicy: Always
         securityContext:
           seccompProfile:

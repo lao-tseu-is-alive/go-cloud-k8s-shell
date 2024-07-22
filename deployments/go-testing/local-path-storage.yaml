@@ -2,8 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: local-path-storage
-# for this local-path storage to work in k3s you need to follow instructions at
-# https://github.com/rancher/local-path-provisioner
+
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -28,18 +27,18 @@ kind: ClusterRole
 metadata:
   name: local-path-provisioner-role
 rules:
-  - apiGroups: [ "" ]
-    resources: [ "nodes", "persistentvolumeclaims", "configmaps" ]
-    verbs: [ "get", "list", "watch" ]
-  - apiGroups: [ "" ]
-    resources: [ "endpoints", "persistentvolumes", "pods" ]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: [ "" ]
-    resources: [ "events" ]
-    verbs: [ "create", "patch" ]
-  - apiGroups: [ "storage.k8s.io" ]
-    resources: [ "storageclasses" ]
-    verbs: [ "get", "list", "watch" ]
+  - apiGroups: [""]
+    resources: ["nodes", "persistentvolumeclaims", "configmaps", "pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -87,10 +86,9 @@ spec:
         app: local-path-provisioner
     spec:
       serviceAccountName: local-path-provisioner-service-account
-#      automountServiceAccountToken: false
       containers:
         - name: local-path-provisioner
-          image: rancher/local-path-provisioner:v0.0.26
+          image: rancher/local-path-provisioner:v0.0.28
           imagePullPolicy: IfNotPresent
           command:
             - local-path-provisioner
@@ -101,20 +99,22 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: /etc/config/
-          env:
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
           resources:
             limits:
               cpu: "2"
               memory: 512Mi
               ephemeral-storage: "250Mi"
             requests:
-                cpu: "1"
-                memory: 256Mi
-                ephemeral-storage: "100Mi"
+              cpu: "1"
+              memory: 256Mi
+              ephemeral-storage: "100Mi"
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_MOUNT_PATH
+              value: /etc/config/
       volumes:
         - name: config-volume
           configMap:
@@ -168,5 +168,3 @@ data:
       - name: helper-pod
         image: busybox
         imagePullPolicy: IfNotPresent
-
-
