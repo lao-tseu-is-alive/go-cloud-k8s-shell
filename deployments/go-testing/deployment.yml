@@ -131,9 +131,10 @@ metadata:
   annotations:
     externalTrafficPolicy: "local"
 spec:
+  type: ClusterIP                 # A ClusterIP service is the default Kubernetes service. It gives you a stable IP address that other apps can use to reach your service.
   #type: NodePort                 # A port is opened on each node in your cluster via Kube proxy.
   # https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
-  type: LoadBalancer             # Adds a load balancer (from the cloud provider)
+  #type: LoadBalancer             # Adds a load balancer (from the cloud provider)
   # k3s will deploy a daemonset listening on the given port on the host node
   # By default k3s have a builtin load balancer called "klipper" https://github.com/k3s-io/klipper-lb ok for one dev node.
   # It is possible to run multiple Services on the same node, as long as they use different ports.
