@@ -2,7 +2,7 @@
 FROM golang:1-alpine3.20 AS builder
 ENV PATH /usr/local/go/bin:$PATH
 ENV GOLANG_VERSION 1.22.5
-# Add Maintainer Info
+
 LABEL maintainer="cgil"
 
 #RUN addgroup -S gouser && adduser -S gouser -G gouser
@@ -31,16 +31,18 @@ FROM ubuntu:24.04
 # It is a best practice to run containers as non-root users
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
 # https://docs.docker.com/engine/reference/builder/#user
-LABEL org.opencontainers.image.description="This is a go-cloud-k8s-shell container image, a simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster " \
-      org.opencontainers.image.authors="cgil" \
-      org.opencontainers.image.url="ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:latest"
+LABEL author="cgil"
+LABEL org.opencontainers.image.authors="cgil"
+LABEL description="This is a go-cloud-k8s-shell container image, a simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster "
+LABEL org.opencontainers.image.description="This is a go-cloud-k8s-shell container image, a simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster "
+LABEL org.opencontainers.image.url="ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:latest"
 
 RUN apt-get update && apt-get install -y iproute2 file checksec nmap postgresql-client curl jq iputils-ping dnsutils tcpdump iftop netcat-openbsd wget && apt-get -y upgrade && apt-get clean
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser
 RUN groupadd pcap && usermod -a -G pcap gouser && chmod a+x /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip  /usr/sbin/iftop
 WORKDIR /tmp
 #RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-RUN curl -LO "https://dl.k8s.io/release/v1.30.2/bin/linux/amd64/kubectl"
+RUN curl -LO "https://dl.k8s.io/release/v1.30.3/bin/linux/amd64/kubectl"
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 WORKDIR /home/gouser
 
@@ -50,7 +52,7 @@ COPY scripts/checkK8SApiInsideContainer.sh ./
 COPY scripts/getK8SApiFromUrl.sh ./
 COPY scripts/getServiceEndPointFromInsideContainer.sh ./
 COPY scripts/checkOtherPodConnectivityInsideContainer.sh ./
-
+COPY certificates/isrg-root-x1-cross-signed.pem ./certificates/
 RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh && chmod a+x ./getServiceEndPointFromInsideContainer.sh &&  chmod a+x ./checkOtherPodConnectivityInsideContainer.sh
 
 # Switch to non-root user:

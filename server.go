@@ -8,6 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/xid"
 	"io"
 	"io/fs"
 	"log"
@@ -20,13 +25,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/rs/xid"
 )
 
 const (
 	VERSION                = "0.1.26"
 	APP                    = "go-cloud-k8s-shell"
+	AppCamelCase           = "goCloudK8sShell"
+	AppGithubUrl           = "https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell"
 	defaultProtocol        = "http"
 	defaultPort            = 9898
 	defaultServerIp        = ""
@@ -36,30 +41,125 @@ const (
 	defaultReadTimeout     = 10 * time.Second // max time to read request from the client
 	defaultWriteTimeout    = 10 * time.Second // max time to write response to the client
 	defaultIdleTimeout     = 2 * time.Minute  // max time for connections using TCP Keep-Alive
-	defaultNotFound        = "🤔 ℍ𝕞𝕞... 𝕤𝕠𝕣𝕣𝕪 :【𝟜𝟘𝟜 : ℙ𝕒𝕘𝕖 ℕ𝕠𝕥 𝔽𝕠𝕦𝕟𝕕】🕳️ 🔥"
+	caCertPath             = "certificates/isrg-root-x1-cross-signed.pem"
 	htmlHeaderStart        = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css"/>`
 	charsetUTF8            = "charset=UTF-8"
 	MIMEAppJSON            = "application/json"
+	MIMEHtml               = "text/html"
 	MIMEAppJSONCharsetUTF8 = MIMEAppJSON + "; " + charsetUTF8
 	HeaderContentType      = "Content-Type"
 	httpErrMethodNotAllow  = "ERROR: Http method not allowed"
 	initCallMsg            = "INITIAL CALL TO %s()\n"
+	defaultUnknown         = "_UNKNOWN_"
 	// defaultUnknown         = "¯\\_( ͡° ͜ʖ ͡°)_/¯"
-	defaultUnknown     = "_UNKNOWN_"
-	formatTraceRequest = "TRACE: [%s] %s  path:'%s', RemoteAddrIP: [%s]\n"
-	formatErrRequest   = "ERROR: Http method not allowed [%s] %s  path:'%s', RemoteAddrIP: [%s]\n"
+	defaultNotFound                 = "404 page not found"
+	defaultNotFoundDescription      = "🤔 ℍ𝕞𝕞... 𝕤𝕠𝕣𝕣𝕪 :【𝟜𝟘𝟜 : ℙ𝕒𝕘𝕖 ℕ𝕠𝕥 𝔽𝕠𝕦𝕟𝕕】🕳️ 🔥"
+	fmtErrK8sServiceHostEnvNotFound = "ERROR: KUBERNETES_SERVICE_HOST ENV variable does not exist (not inside K8s ?)."
+	formatTraceRequest              = "TRACE: [%s] %s  path:'%s', RemoteAddrIP: [%s]\n"
+	formatErrRequest                = "ERROR: Http method not allowed [%s] %s  path:'%s', RemoteAddrIP: [%s]\n"
 )
 
+var rootPathGetCounter = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Name: fmt.Sprintf("%s_root_get_request_count", AppCamelCase),
+		Help: fmt.Sprintf("Number of GET request handled by %s default root handler", AppCamelCase),
+	},
+)
+
+var rootPathNotFoundCounter = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Name: fmt.Sprintf("%s_root_not_found_request_count", AppCamelCase),
+		Help: fmt.Sprintf("Number of page not found handled by %s default root handler", AppCamelCase),
+	},
+)
+
+type Middleware interface {
+	// WrapHandler wraps the given HTTP handler for instrumentation.
+	WrapHandler(handlerName string, handler http.Handler) http.HandlerFunc
+}
+
+type middleware struct {
+	buckets  []float64
+	registry prometheus.Registerer
+}
+
+// WrapHandler wraps the given HTTP handler for instrumentation:
+// It registers four metric collectors (if not already done) and reports HTTP
+// metrics to the (newly or already) registered collectors.
+// Each has a constant label named "handler" with the provided handlerName as
+// value.
+func (m *middleware) WrapHandler(handlerName string, handler http.Handler) http.HandlerFunc {
+	reg := prometheus.WrapRegistererWith(prometheus.Labels{"handler": handlerName}, m.registry)
+
+	requestsTotal := promauto.With(reg).NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Tracks the number of HTTP requests.",
+		}, []string{"method", "code"},
+	)
+	requestDuration := promauto.With(reg).NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_request_duration_seconds",
+			Help:    "Tracks the latencies for HTTP requests.",
+			Buckets: m.buckets,
+		},
+		[]string{"method", "code"},
+	)
+	requestSize := promauto.With(reg).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "http_request_size_bytes",
+			Help: "Tracks the size of HTTP requests.",
+		},
+		[]string{"method", "code"},
+	)
+	responseSize := promauto.With(reg).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "http_response_size_bytes",
+			Help: "Tracks the size of HTTP responses.",
+		},
+		[]string{"method", "code"},
+	)
+
+	// Wraps the provided http.Handler to observe the request result with the provided metrics.
+	base := promhttp.InstrumentHandlerCounter(
+		requestsTotal,
+		promhttp.InstrumentHandlerDuration(
+			requestDuration,
+			promhttp.InstrumentHandlerRequestSize(
+				requestSize,
+				promhttp.InstrumentHandlerResponseSize(
+					responseSize,
+					handler,
+				),
+			),
+		),
+	)
+
+	return base.ServeHTTP
+}
+
+// NewMiddleware returns a Middleware interface.
+func NewMiddleware(registry prometheus.Registerer, buckets []float64) Middleware {
+	if buckets == nil {
+		buckets = prometheus.ExponentialBuckets(0.1, 1.5, 5)
+	}
+
+	return &middleware{
+		buckets:  buckets,
+		registry: registry,
+	}
+}
+
 type RuntimeInfo struct {
-	Hostname            string              `json:"hostname"`              //  host name reported by the kernel.
-	Pid                 int                 `json:"pid"`                   //  process id of the caller.
-	PPid                int                 `json:"ppid"`                  //  process id of the caller's parent.
-	Uid                 int                 `json:"uid"`                   //  numeric user id of the caller.
+	Hostname            string              `json:"hostname"`              // host name reported by the kernel.
+	Pid                 int                 `json:"pid"`                   // process id of the caller.
+	PPid                int                 `json:"ppid"`                  // process id of the caller's parent.
+	Uid                 int                 `json:"uid"`                   // numeric user id of the caller.
 	Appname             string              `json:"appname"`               // name of this application
 	Version             string              `json:"version"`               // version of this application
 	ParamName           string              `json:"param_name"`            // value of the name parameter (_NO_PARAMETER_NAME_ if name was not set)
 	RemoteAddr          string              `json:"remote_addr"`           // remote client ip address
-	RequestId           string              `json:"request_id"`            //  globally unique request id
+	RequestId           string              `json:"request_id"`            // globally unique request id
 	GOOS                string              `json:"goos"`                  // operating system
 	GOARCH              string              `json:"goarch"`                // architecture
 	Runtime             string              `json:"runtime"`               // go runtime at compilation time
@@ -72,6 +172,7 @@ type RuntimeInfo struct {
 	UptimeOs            string              `json:"uptime_os"`             // tells how long system was started based on /proc/uptime
 	K8sApiUrl           string              `json:"k8s_api_url"`           // url for k8s api based KUBERNETES_SERVICE_HOST
 	K8sVersion          string              `json:"k8s_version"`           // version of k8s cluster
+	K8sLatestVersion    string              `json:"k8s_latest_version"`    // latest version announced in https://kubernetes.io/
 	K8sCurrentNamespace string              `json:"k8s_current_namespace"` // k8s namespace of this container
 	EnvVars             []string            `json:"env_vars"`              // environment variables
 	Headers             map[string][]string `json:"headers"`               // received headers
@@ -98,6 +199,13 @@ type K8sInfo struct {
 	Version          string `json:"version"`
 	Token            string `json:"token"`
 	CaCert           string `json:"ca_cert"`
+}
+
+func CloseBody(Body io.ReadCloser, msg string, logger *log.Logger) {
+	err := Body.Close()
+	if err != nil {
+		logger.Printf("Error %v in %s doing Body.Close().\n", err, msg)
+	}
 }
 
 func GetOsUptime() (string, error) {
@@ -191,7 +299,7 @@ func GetKubernetesApiUrlFromEnv() (string, error) {
 	if !exist {
 		return "", &ErrorConfig{
 			err: err,
-			msg: "ERROR: KUBERNETES_SERVICE_HOST ENV variable does not exist (not inside K8s ?).",
+			msg: fmtErrK8sServiceHostEnvNotFound,
 		}
 	}
 	k8sApiUrl = fmt.Sprintf("%s%s", k8sApiUrl, val)
@@ -262,7 +370,7 @@ func GetKubernetesConnInfo(logger *log.Logger) (*K8sInfo, ErrorConfig) {
 		}
 	}
 	urlVersion := fmt.Sprintf("%s/openapi/v2", k8sUrl)
-	res, err := GetJsonFromUrl(urlVersion, info.Token, K8sCaCert, logger)
+	res, err := GetJsonFromUrl(urlVersion, info.Token, K8sCaCert, true, logger)
 	if err != nil {
 
 		logger.Printf("GetKubernetesConnInfo: error in GetJsonFromUrl(url:%s) err:%v", urlVersion, err)
@@ -289,12 +397,16 @@ func GetKubernetesConnInfo(logger *log.Logger) (*K8sInfo, ErrorConfig) {
 	}
 }
 
-func GetJsonFromUrl(url string, token string, caCert []byte, logger *log.Logger) (string, error) {
+func GetJsonFromUrl(url string, bearerToken string, caCert []byte, allowInsecure bool, logger *log.Logger) (string, error) {
 	// Create a Bearer string by appending string access token
-	var bearer = "Bearer " + token
+	var bearer = "Bearer " + bearerToken
 
 	// Create a new request using http
 	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		logger.Printf("Error on http.NewRequest [ERROR: %v]\n", err)
+		return "", err
+	}
 
 	// add authorization header to the req
 	req.Header.Add("Authorization", bearer)
@@ -302,7 +414,8 @@ func GetJsonFromUrl(url string, token string, caCert []byte, logger *log.Logger)
 	caCertPool.AppendCertsFromPEM(caCert)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			RootCAs: caCertPool,
+			RootCAs:            caCertPool,
+			InsecureSkipVerify: allowInsecure,
 		},
 	}
 	// Send req using http Client
@@ -311,17 +424,15 @@ func GetJsonFromUrl(url string, token string, caCert []byte, logger *log.Logger)
 		Timeout:   defaultReadTimeout,
 	}
 	resp, err := client.Do(req)
-
 	if err != nil {
-		logger.Println("Error on response.\n[ERROR] -", err)
+		logger.Println("Error on sending request.\n[ERROR] -", err)
 		return "", err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			logger.Println("Error on Body.Close().\n[ERROR] -", err)
-		}
-	}(resp.Body)
+	defer CloseBody(resp.Body, "GetJsonFromUrl", logger)
+	if resp.StatusCode != http.StatusOK {
+		logger.Printf("Error on response StatusCode is not OK Received StatusCode:%d\n", resp.StatusCode)
+		return "", errors.New(fmt.Sprintf("Error on response StatusCode:%d\n", resp.StatusCode))
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -330,20 +441,169 @@ func GetJsonFromUrl(url string, token string, caCert []byte, logger *log.Logger)
 	}
 	return string(body), nil
 }
+func getKubernetesInfo(l *log.Logger) (string, string, string) {
+	k8sVersion := ""
+	k8sCurrentNameSpace := ""
+	k8sUrl := ""
 
-func getHtmlHeader(title string) string {
-	return fmt.Sprintf("%s<title>%s</title></head>", htmlHeaderStart, title)
+	k8sUrl, err := GetKubernetesApiUrlFromEnv()
+	if err != nil {
+		l.Printf("💥💥 ERROR: 'GetKubernetesApiUrlFromEnv() returned an error : %+#v'", err)
+	} else {
+		info, errConnInfo := GetKubernetesConnInfo(l)
+		if errConnInfo.err != nil {
+			l.Printf("💥💥 ERROR: 'GetKubernetesConnInfo() returned an error : %s : %+#v'", errConnInfo.msg, errConnInfo.err)
+		}
+		k8sVersion = info.Version
+		k8sCurrentNameSpace = info.CurrentNamespace
+	}
+
+	return k8sUrl, k8sVersion, k8sCurrentNameSpace
 }
 
-func getHtmlPage(title string) string {
-	return getHtmlHeader(title) +
-		fmt.Sprintf("\n<body><div class=\"container\"><h3>%s</h3></div></body></html>", title)
+func GetKubernetesLatestVersion(logger *log.Logger) (string, error) {
+	k8sUrl := "https://kubernetes.io/"
+	// Make an HTTP GET request to the Kubernetes releases page
+	// Create a new request using http
+	req, err := http.NewRequest("GET", k8sUrl, nil)
+	if err != nil {
+		logger.Printf("Error on http.NewRequest [ERROR: %v]\n", err)
+		return "", err
+	}
+	caCert, err := os.ReadFile(caCertPath)
+	if err != nil {
+		logger.Printf("Error on ReadFile(caCertPath) [ERROR: %v]\n", err)
+		return "", err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: caCertPool,
+		},
+	}
+
+	//tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify: true} }
+
+	// add authorization header to the req
+	// req.Header.Add("Authorization", bearer)
+	// Send req using http Client
+	client := &http.Client{
+		Timeout:   defaultReadTimeout,
+		Transport: tr,
+	}
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		logger.Println("Error on response.\n[ERROR] -", err)
+		return fmt.Sprintf("GetKubernetesLatestVersion was unable to get content from %s, Error: %v", k8sUrl, err), err
+	}
+	defer CloseBody(resp.Body, "GetKubernetesLatestVersion", logger)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Println("Error while reading the response bytes:", err)
+		return fmt.Sprintf("GetKubernetesLatestVersion got a problem reading the response from %s, Error: %v", k8sUrl, err), err
+	}
+	// Use a regular expression to extract the latest release number from the page
+	re := regexp.MustCompile(`(?m)href=.+?>v(\d+\.\d+)`)
+	matches := re.FindAllStringSubmatch(string(body), -1)
+	if matches == nil {
+		return fmt.Sprintf("GetKubernetesLatestVersion was unable to find latest release number from %s", k8sUrl), nil
+	}
+	// Print only the release numbers
+	maxVersion := 0.0
+	for _, match := range matches {
+		// fmt.Println(match[1])
+		if val, err := strconv.ParseFloat(match[1], 32); err == nil {
+			if val > maxVersion {
+				maxVersion = val
+			}
+		}
+	}
+	// latestRelease := matches[0]
+	// fmt.Printf("\nThe latest major release of Kubernetes is %T : %v+", latestRelease, latestRelease)
+	return fmt.Sprintf("%2.2f", maxVersion), nil
+}
+
+func handleOsInfoError(errConf ErrorConfig, l *log.Logger) {
+	var pathError *fs.PathError
+	switch {
+	case errors.As(errConf.err, &pathError):
+		l.Printf("NOTICE: 'GetOsInfo() did not find os-release : %v'", errConf.err)
+	default:
+		l.Printf("💥💥 ERROR: 'GetOsInfo() returned an error : %+#v'", errConf.err)
+	}
+}
+
+func collectRuntimeInfo(l *log.Logger) RuntimeInfo {
+	hostName, err := os.Hostname()
+	if err != nil {
+		l.Printf("💥💥 ERROR: 'os.Hostname() returned an error : %v'", err)
+		hostName = "#unknown#"
+	}
+
+	osReleaseInfo, errConf := GetOsInfo()
+	if errConf.err != nil {
+		handleOsInfoError(errConf, l)
+	}
+
+	uptimeOS, err := GetOsUptime()
+	if err != nil {
+		l.Printf("💥💥 ERROR: 'GetOsUptime() returned an error : %+#v'", err)
+	}
+
+	k8sApiUrl, k8sVersion, k8sCurrentNameSpace := getKubernetesInfo(l)
+
+	latestK8sVersion, err := GetKubernetesLatestVersion(l)
+	if err != nil {
+		l.Printf("💥💥 ERROR: 'GetKubernetesLatestVersion() returned an error : %+#v'", err)
+	}
+
+	return RuntimeInfo{
+		Hostname:            hostName,
+		Pid:                 os.Getpid(),
+		PPid:                os.Getppid(),
+		Uid:                 os.Getuid(),
+		Appname:             APP,
+		Version:             VERSION,
+		ParamName:           "_NO_PARAMETER_NAME_",
+		RemoteAddr:          "",
+		RequestId:           "",
+		GOOS:                runtime.GOOS,
+		GOARCH:              runtime.GOARCH,
+		Runtime:             runtime.Version(),
+		NumGoroutine:        strconv.FormatInt(int64(runtime.NumGoroutine()), 10),
+		OsReleaseName:       osReleaseInfo.Name,
+		OsReleaseVersion:    osReleaseInfo.Version,
+		OsReleaseVersionId:  osReleaseInfo.VersionId,
+		NumCPU:              strconv.FormatInt(int64(runtime.NumCPU()), 10),
+		Uptime:              "",
+		UptimeOs:            uptimeOS,
+		K8sApiUrl:           k8sApiUrl,
+		K8sVersion:          k8sVersion,
+		K8sLatestVersion:    latestK8sVersion,
+		K8sCurrentNamespace: k8sCurrentNameSpace,
+		EnvVars:             os.Environ(),
+		Headers:             map[string][]string{},
+	}
+}
+
+func getHtmlHeader(title string, description string) string {
+	return fmt.Sprintf("%s<meta name=\"description\" content=\"%s\"><title>%s</title></head>", htmlHeaderStart, description, title)
+}
+
+func getHtmlPage(title string, description string) string {
+	return getHtmlHeader(title, description) +
+		fmt.Sprintf("\n<body><div class=\"container\"><h4>%s</h4></div></body></html>", title)
 }
 
 // WaitForHttpServer attempts to establish a TCP connection to listenAddress
 // in a given amount of time. It returns upon a successful connection;
 // otherwise exits with an error.
 func WaitForHttpServer(listenAddress string, waitDuration time.Duration, numRetries int) {
+	log.Printf("INFO: 'WaitForHttpServer Will wait for server to be up at %s for %v seconds, with %d retries'\n", listenAddress, waitDuration.Seconds(), numRetries)
 	httpClient := http.Client{
 		Timeout: 5 * time.Second,
 	}
@@ -393,6 +653,7 @@ type GoHttpServer struct {
 	//DB  *db.Conn
 	logger     *log.Logger
 	router     *http.ServeMux
+	registry   *prometheus.Registry
 	startTime  time.Time
 	httpServer http.Server
 }
@@ -400,10 +661,23 @@ type GoHttpServer struct {
 // NewGoHttpServer is a constructor that initializes the server mux (routes) and all fields of the  GoHttpServer type
 func NewGoHttpServer(listenAddress string, logger *log.Logger) *GoHttpServer {
 	myServerMux := http.NewServeMux()
+	// Create non-global registry.
+	registry := prometheus.NewRegistry()
+
+	// Add go runtime metrics and process collectors.
+	registry.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
+
+	registry.MustRegister(rootPathGetCounter)
+	registry.MustRegister(rootPathNotFoundCounter)
+
 	myServer := GoHttpServer{
 		listenAddress: listenAddress,
 		logger:        logger,
 		router:        myServerMux,
+		registry:      registry,
 		startTime:     time.Now(),
 		httpServer: http.Server{
 			Addr:         listenAddress,       // configure the bind address
@@ -421,13 +695,29 @@ func NewGoHttpServer(listenAddress string, logger *log.Logger) *GoHttpServer {
 
 // (*GoHttpServer) routes initializes all the handlers paths of this web server, it is called inside the NewGoHttpServer constructor
 func (s *GoHttpServer) routes() {
-	s.router.Handle("/", s.getMyDefaultHandler())
-	s.router.Handle("/time", s.getTimeHandler())
-	s.router.Handle("/wait", s.getWaitHandler(defaultSecondsToSleep))
-	s.router.Handle("/readiness", s.getReadinessHandler())
-	s.router.Handle("/health", s.getHealthHandler())
+	// using new server Mux in Go 1.22 https://pkg.go.dev/net/http#ServeMux
+	s.router.Handle("GET /{$}", NewMiddleware(
+		s.registry, nil).
+		WrapHandler("GET /$", s.getMyDefaultHandler()),
+	)
+	s.router.Handle("GET /time", s.getTimeHandler())
+	s.router.Handle("GET /wait", s.getWaitHandler(defaultSecondsToSleep))
+	s.router.Handle("GET /readiness", s.getReadinessHandler())
+	s.router.Handle("GET /health", s.getHealthHandler())
+	//expose the default prometheus metrics for Go applications
+	s.router.Handle("GET /metrics", NewMiddleware(
+		s.registry, nil).
+		WrapHandler("GET /metrics", promhttp.HandlerFor(
+			s.registry,
+			promhttp.HandlerOpts{}),
+		))
 
-	//s.router.Handle("/hello", s.getHelloHandler())
+	s.router.Handle("GET /...", s.getHandlerNotFound())
+}
+
+// AddRoute   adds a handler for this web server
+func (s *GoHttpServer) AddRoute(pathPattern string, handler http.Handler) {
+	s.router.Handle(pathPattern, handler)
 }
 
 // StartServer initializes all the handlers paths of this web server, it is called inside the NewGoHttpServer constructor
@@ -448,18 +738,18 @@ func (s *GoHttpServer) StartServer() {
 
 }
 
-func (s *GoHttpServer) jsonResponse(w http.ResponseWriter, result interface{}) {
+func (s *GoHttpServer) jsonResponse(w http.ResponseWriter, result interface{}) error {
 	body, err := json.Marshal(result)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		s.logger.Printf("ERROR: 'JSON marshal failed. Error: %v'", err)
-		return
+		return err
 	}
 	var prettyOutput bytes.Buffer
 	err = json.Indent(&prettyOutput, body, "", "  ")
 	if err != nil {
 		s.logger.Printf("ERROR: 'JSON Indent failed. Error: %v'", err)
-		return
+		return err
 	}
 	w.Header().Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -467,8 +757,9 @@ func (s *GoHttpServer) jsonResponse(w http.ResponseWriter, result interface{}) {
 	_, err = w.Write(prettyOutput.Bytes())
 	if err != nil {
 		s.logger.Printf("ERROR: 'w.Write failed. Error: %v'", err)
-		return
+		return err
 	}
+	return nil
 }
 
 //############# BEGIN HANDLERS
@@ -478,11 +769,7 @@ func (s *GoHttpServer) getReadinessHandler() http.HandlerFunc {
 	s.logger.Printf(initCallMsg, handlerName)
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.logger.Printf(formatTraceRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
-		if r.Method == http.MethodGet {
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
+		w.WriteHeader(http.StatusOK)
 	}
 }
 func (s *GoHttpServer) getHealthHandler() http.HandlerFunc {
@@ -490,96 +777,15 @@ func (s *GoHttpServer) getHealthHandler() http.HandlerFunc {
 	s.logger.Printf(initCallMsg, handlerName)
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.logger.Printf(formatTraceRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
-		if r.Method == http.MethodGet {
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
+		w.WriteHeader(http.StatusOK)
 	}
 }
-
-func (s *GoHttpServer) handleOsInfoError(errConf ErrorConfig) {
-	var pathError *fs.PathError
-	switch {
-	case errors.As(errConf.err, &pathError):
-		s.logger.Printf("NOTICE: 'GetOsInfo() did not find os-release : %v'", errConf.err)
-	default:
-		s.logger.Printf("💥💥 ERROR: 'GetOsInfo() returned an error : %+#v'", errConf.err)
-	}
-}
-func (s *GoHttpServer) getKubernetesInfo() (string, string, string) {
-	k8sVersion := ""
-	k8sCurrentNameSpace := ""
-	k8sUrl := ""
-
-	k8sUrl, err := GetKubernetesApiUrlFromEnv()
-	if err != nil {
-		s.logger.Printf("💥💥 ERROR: 'GetKubernetesApiUrlFromEnv() returned an error : %+#v'", err)
-	} else {
-		info, errConnInfo := GetKubernetesConnInfo(s.logger)
-		if errConnInfo.err != nil {
-			s.logger.Printf("💥💥 ERROR: 'GetKubernetesConnInfo() returned an error : %s : %+#v'", errConnInfo.msg, errConnInfo.err)
-		}
-		k8sVersion = info.Version
-		k8sCurrentNameSpace = info.CurrentNamespace
-	}
-
-	return k8sUrl, k8sVersion, k8sCurrentNameSpace
-}
-
-func (s *GoHttpServer) collectRuntimeInfo() RuntimeInfo {
-	hostName, err := os.Hostname()
-	if err != nil {
-		s.logger.Printf("💥💥 ERROR: 'os.Hostname() returned an error : %v'", err)
-		hostName = "#unknown#"
-	}
-
-	osReleaseInfo, errConf := GetOsInfo()
-	if errConf.err != nil {
-		s.handleOsInfoError(errConf)
-	}
-
-	uptimeOS, err := GetOsUptime()
-	if err != nil {
-		s.logger.Printf("💥💥 ERROR: 'GetOsUptime() returned an error : %+#v'", err)
-	}
-
-	k8sApiUrl, k8sVersion, k8sCurrentNameSpace := s.getKubernetesInfo()
-
-	return RuntimeInfo{
-		Hostname:            hostName,
-		Pid:                 os.Getpid(),
-		PPid:                os.Getppid(),
-		Uid:                 os.Getuid(),
-		Appname:             APP,
-		Version:             VERSION,
-		ParamName:           "_NO_PARAMETER_NAME_",
-		RemoteAddr:          "",
-		RequestId:           "",
-		GOOS:                runtime.GOOS,
-		GOARCH:              runtime.GOARCH,
-		Runtime:             runtime.Version(),
-		NumGoroutine:        strconv.FormatInt(int64(runtime.NumGoroutine()), 10),
-		OsReleaseName:       osReleaseInfo.Name,
-		OsReleaseVersion:    osReleaseInfo.Version,
-		OsReleaseVersionId:  osReleaseInfo.VersionId,
-		NumCPU:              strconv.FormatInt(int64(runtime.NumCPU()), 10),
-		Uptime:              fmt.Sprintf("%s", time.Since(s.startTime)),
-		UptimeOs:            uptimeOS,
-		K8sApiUrl:           k8sApiUrl,
-		K8sVersion:          k8sVersion,
-		K8sCurrentNamespace: k8sCurrentNameSpace,
-		EnvVars:             os.Environ(),
-		Headers:             map[string][]string{},
-	}
-}
-
 func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
 	handlerName := "getMyDefaultHandler"
 
 	s.logger.Printf(initCallMsg, handlerName)
 
-	data := s.collectRuntimeInfo()
+	data := collectRuntimeInfo(s.logger)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		remoteIp := r.RemoteAddr // ip address of the original request or the last proxy
@@ -587,64 +793,82 @@ func (s *GoHttpServer) getMyDefaultHandler() http.HandlerFunc {
 		guid := xid.New()
 		s.logger.Printf("INFO: 'Request ID: %s'\n", guid.String())
 		s.logger.Printf(formatTraceRequest, handlerName, r.Method, requestedUrlPath, remoteIp)
-		switch r.Method {
-		case http.MethodGet:
-			if len(strings.TrimSpace(requestedUrlPath)) == 0 || requestedUrlPath == defaultServerPath {
-				query := r.URL.Query()
-				nameValue := query.Get("name")
-				if nameValue != "" {
-					data.ParamName = nameValue
-				}
-				data.RemoteAddr = remoteIp
-				data.Headers = r.Header
-				data.Uptime = fmt.Sprintf("%s", time.Since(s.startTime))
-				uptimeOS, err := GetOsUptime()
-				if err != nil {
-					s.logger.Printf("💥💥 ERROR: 'GetOsUptime() returned an error : %+#v'", err)
-				}
-				data.UptimeOs = uptimeOS
-				data.RequestId = guid.String()
-				s.jsonResponse(w, data)
-				/*n, err := fmt.Fprintf(w, getHtmlPage(defaultMessage))
-				if err != nil {
-					s.logger.Printf("💥💥 ERROR: [%s] was unable to Fprintf. path:'%s', from IP: [%s], send_bytes:%d'\n", handlerName, requestedUrlPath, remoteIp, n)
-					http.Error(w, "Internal server error. myDefaultHandler was unable to Fprintf", http.StatusInternalServerError)
-					return
-				}*/
-				s.logger.Printf("SUCCESS: [%s] path:'%s', from IP: [%s]\n", handlerName, requestedUrlPath, remoteIp)
-			} else {
-				w.WriteHeader(http.StatusNotFound)
-				n, err := fmt.Fprintf(w, getHtmlPage(defaultNotFound))
-				if err != nil {
-					s.logger.Printf("💥💥 ERROR: [%s] Not Found was unable to Fprintf. path:'%s', from IP: [%s], send_bytes:%d\n", handlerName, requestedUrlPath, remoteIp, n)
-					http.Error(w, "Internal server error. myDefaultHandler was unable to Fprintf", http.StatusInternalServerError)
-					return
-				}
-			}
-		default:
-			s.logger.Printf(formatErrRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
-			http.Error(w, httpErrMethodNotAllow, http.StatusMethodNotAllowed)
+		query := r.URL.Query()
+		nameValue := query.Get("name")
+		if nameValue != "" {
+			data.ParamName = nameValue
+		}
+		data.Hostname, _ = os.Hostname()
+		data.RemoteAddr = remoteIp
+		data.Headers = r.Header
+		data.Uptime = fmt.Sprintf("%s", time.Since(s.startTime))
+		uptimeOS, err := GetOsUptime()
+		if err != nil {
+			s.logger.Printf("💥💥 ERROR: 'GetOsUptime() returned an error : %+#v'", err)
+		}
+		data.UptimeOs = uptimeOS
+		data.RequestId = guid.String()
+		rootPathGetCounter.Inc()
+		err = s.jsonResponse(w, data)
+		if err != nil {
+			s.logger.Printf("ERROR:  %v doing jsonResponse [%s] path:'%s', from IP: [%s]\n", err, handlerName, requestedUrlPath, remoteIp)
+			return
+		}
+		s.logger.Printf("SUCCESS: [%s] path:'%s', from IP: [%s]\n", handlerName, requestedUrlPath, remoteIp)
+
+	}
+}
+func (s *GoHttpServer) getHandlerNotFound() http.HandlerFunc {
+	handlerName := "getHandlerNotFound"
+	s.logger.Printf(initCallMsg, handlerName)
+	return func(w http.ResponseWriter, r *http.Request) {
+		s.logger.Printf(formatErrRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
+		w.Header().Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
+		w.WriteHeader(http.StatusNotFound)
+		rootPathNotFoundCounter.Inc()
+		type NotFound struct {
+			Status  int    `json:"status"`
+			Error   string `json:"error"`
+			Message string `json:"message"`
+		}
+		data := &NotFound{
+			Status:  http.StatusNotFound,
+			Error:   defaultNotFound,
+			Message: defaultNotFoundDescription,
+		}
+		err := json.NewEncoder(w).Encode(data)
+		if err != nil {
+			s.logger.Printf("💥💥 ERROR: [%s] Not Found was unable to Fprintf. path:'%s', from IP: [%s]\n", handlerName, r.URL.Path, r.RemoteAddr)
+			http.Error(w, "Internal server error. myDefaultHandler was unable to Fprintf", http.StatusInternalServerError)
 		}
 	}
 }
-
+func (s *GoHttpServer) getHandlerStaticPage(title string, descr string) http.HandlerFunc {
+	handlerName := fmt.Sprintf("getHandlerStaticPage[%s]", title)
+	s.logger.Printf(initCallMsg, handlerName)
+	return func(w http.ResponseWriter, r *http.Request) {
+		s.logger.Printf(formatErrRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
+		w.Header().Set(HeaderContentType, MIMEHtml)
+		w.WriteHeader(http.StatusOK)
+		n, err := fmt.Fprintf(w, getHtmlPage(title, descr))
+		if err != nil {
+			s.logger.Printf("💥💥 ERROR: [%s]  was unable to Fprintf. path:'%s', from IP: [%s], send_bytes:%d\n", handlerName, r.URL.Path, r.RemoteAddr, n)
+			http.Error(w, "Internal server error. getHandlerStaticPage was unable to Fprintf", http.StatusInternalServerError)
+		}
+	}
+}
 func (s *GoHttpServer) getTimeHandler() http.HandlerFunc {
 	handlerName := "getTimeHandler"
 	s.logger.Printf(initCallMsg, handlerName)
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.logger.Printf(formatTraceRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
-		if r.Method == http.MethodGet {
-			now := time.Now()
-			w.Header().Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
-			w.WriteHeader(http.StatusOK)
-			_, err := fmt.Fprintf(w, "{\"time\":\"%s\"}", now.Format(time.RFC3339))
-			if err != nil {
-				s.logger.Printf("Error doing fmt.Fprintf err: %s", err)
-				return
-			}
-		} else {
-			s.logger.Printf(formatErrRequest, handlerName, r.Method, r.URL.Path, r.RemoteAddr)
-			http.Error(w, httpErrMethodNotAllow, http.StatusMethodNotAllowed)
+		now := time.Now()
+		w.Header().Set(HeaderContentType, MIMEAppJSONCharsetUTF8)
+		w.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprintf(w, "{\"time\":\"%s\"}", now.Format(time.RFC3339))
+		if err != nil {
+			s.logger.Printf("Error doing fmt.Fprintf err: %s", err)
+			return
 		}
 	}
 }
@@ -678,7 +902,11 @@ func main() {
 	}
 	listenAddr = defaultServerIp + listenAddr
 	l := log.New(os.Stdout, fmt.Sprintf("HTTP_SERVER_%s ", APP), log.Ldate|log.Ltime|log.Lshortfile)
+	l.Printf("INFO: '🚀🚀 App %s version:%s  from %s'", APP, VERSION, AppGithubUrl)
 	l.Printf("INFO: 'Starting %s version:%s HTTP server on port %s'", APP, VERSION, listenAddr)
 	server := NewGoHttpServer(listenAddr, l)
+	// curl -vv  -X POST -H 'Content-Type: application/json'  http://localhost:8080/time   ==> 405 Method Not Allowed,
+	// curl -vv  -X GET  -H 'Content-Type: application/json'  http://localhost:8080/time	==>200 OK , {"time":"2024-07-15T15:30:21+02:00"}
+	server.AddRoute("GET /hello", server.getHandlerStaticPage("Hello", "Hello World!"))
 	server.StartServer()
 }
