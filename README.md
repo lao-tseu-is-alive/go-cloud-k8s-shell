@@ -7,7 +7,7 @@
 [![codecov](https://codecov.io/gh/lao-tseu-is-alive/go-cloud-k8s-shell/branch/main/graph/badge.svg)](https://codecov.io/gh/lao-tseu-is-alive/go-cloud-k8s-shell)
 [![Go Test](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/go-test.yml/badge.svg)](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/go-test.yml)
 
-A simple Golang microservice with some essential command line  tools to make some tests inside a k8s cluster
+A simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster
 
 ### some things to try inside a shell for this container:
  
