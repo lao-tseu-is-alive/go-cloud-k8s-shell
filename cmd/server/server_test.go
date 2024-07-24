@@ -43,11 +43,11 @@ type TestMainStruct struct {
 	body                         string
 }
 
-func TestGoHttpServerMyDefaultHandler(t *testing.T) {
+func TestGoHttpServerInfoHandler(t *testing.T) {
 	var nameParameter string
 	listenAddr := fmt.Sprintf(":%d", defaultPort)
 	myServer := go_http.NewGoHttpServer(listenAddr, l)
-	ts := httptest.NewServer(GetMyDefaultHandler(myServer))
+	ts := httptest.NewServer(GetInfoHandler(myServer))
 	defer ts.Close()
 
 	newRequest := func(method, url string, body string) *http.Request {
@@ -66,14 +66,14 @@ func TestGoHttpServerMyDefaultHandler(t *testing.T) {
 	}
 	tests := []testStruct{
 		{
-			name:           "1: Get on default Server Path should return a valid json containing param value",
+			name:           "/info Get should return a valid json containing param value",
 			wantStatusCode: http.StatusOK,
 			wantBody:       `"param_name": "╚»☯💥⚡✌ℂ𝔾𝕀𝕃✌⚡💥☯«╝"`,
 			paramKeyValues: map[string]string{"name": "╚»☯💥⚡✌ℂ𝔾𝕀𝕃✌⚡💥☯«╝"},
 			r:              newRequest(http.MethodGet, defaultServerPath, ""),
 		},
 		{
-			name:           "2: Get on default Server Path should return Http Status Ok",
+			name:           "/info Get should return Http Status Ok",
 			wantStatusCode: http.StatusOK,
 			wantBody:       "",
 			paramKeyValues: make(map[string]string),
@@ -332,10 +332,10 @@ func TestMainExecution(t *testing.T) {
 
 	tests := []TestMainStruct{
 		{
-			name:                         "Get on default get handler should contain the Appname field",
+			name:                         "Get on default get handler should contain the App name",
 			wantStatusCode:               http.StatusOK,
-			contentType:                  go_http.MIMEAppJSON,
-			wantBody:                     fmt.Sprintf("\"appname\": \"%s\"", version.APP),
+			contentType:                  go_http.MIMEHtml,
+			wantBody:                     version.APP,
 			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodGet,
 			url:                          "/",
@@ -365,11 +365,11 @@ func TestMainExecution(t *testing.T) {
 			body:                         "",
 		},
 		{
-			name:                         "Get on default Server Path should return a valid json containing param value",
+			name:                         "Get on default Server Path should return a valid html containing app",
 			wantStatusCode:               http.StatusOK,
-			contentType:                  go_http.MIMEAppJSON,
-			wantBody:                     `"param_name": "╚»☯💥⚡✌ℂ𝔾𝕀𝕃✌⚡💥☯«╝"`,
-			paramKeyValues:               map[string]string{"name": "╚»☯💥⚡✌ℂ𝔾𝕀𝕃✌⚡💥☯«╝"},
+			contentType:                  go_http.MIMEHtml,
+			wantBody:                     version.APP,
+			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodGet,
 			url:                          "/",
 			useFormUrlencodedContentType: false,
@@ -407,17 +407,6 @@ func TestMainExecution(t *testing.T) {
 			url:                          "/time",
 			useFormUrlencodedContentType: false,
 			body:                         `{"task":"test not allowed method "}`,
-		},
-		{
-			name:                         "/hello Get should return a welcome message",
-			wantStatusCode:               http.StatusOK,
-			contentType:                  go_http.MIMEHtml,
-			wantBody:                     "Hello World!",
-			paramKeyValues:               make(map[string]string),
-			httpMethod:                   http.MethodGet,
-			url:                          "/hello",
-			useFormUrlencodedContentType: false,
-			body:                         ``,
 		},
 	}
 
