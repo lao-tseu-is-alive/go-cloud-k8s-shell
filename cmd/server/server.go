@@ -3,16 +3,17 @@ package main
 import (
 	"embed"
 	"fmt"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/config"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/go_http"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/info"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
-	"github.com/rs/xid"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/config"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/go_http"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/info"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
+	"github.com/rs/xid"
 )
 
 const (
@@ -24,7 +25,7 @@ const (
 
 // content holds our static web server content.
 //
-//go:embed front/dist
+//go:embed all:front/dist
 var content embed.FS
 
 func GetMyDefaultHandler(s *go_http.GoHttpServer, webRootDir string, content embed.FS) http.HandlerFunc {
@@ -37,12 +38,32 @@ func GetMyDefaultHandler(s *go_http.GoHttpServer, webRootDir string, content emb
 	if err != nil {
 		logger.Fatalf("Error creating sub-filesystem: %v", err)
 	}
-	// Create a file server handler for the subfolder
+
+	// Create a file server handler for the embed filesystem
+	//handler := http.StripPrefix(webRootDir, http.FileServer(http.FS(subFS)))
 	handler := http.FileServer(http.FS(subFS))
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		go_http.TraceRequest(handlerName, r, logger)
 		go_http.RootPathGetCounter.Inc()
+
+		// Log the requested path
+		logger.Printf("Requested path: %s", r.URL.Path)
+
+		// Trim the leading slash if it exists
+		//urlPath := strings.TrimPrefix(r.URL.Path, "/")
+		// urlPath := r.URL.Path
+
+		// Check if the file exists in the embedded filesystem
+		/*
+			_, err := content.Open(urlPath)
+			if err != nil {
+				logger.Printf("File not found: %s, error: %v", urlPath, err)
+				http.NotFound(w, r)
+				return
+			}
+		*/
+
 		handler.ServeHTTP(w, r)
 	}
 }
@@ -95,9 +116,9 @@ func main() {
 	// using new server Mux in Go 1.22 https://pkg.go.dev/net/http#ServeMux
 	mux := server.GetRouter()
 	mux.Handle("GET /info", GetInfoHandler(server))
-	mux.Handle("GET /{$}", go_http.NewMiddleware(
+	mux.Handle("GET /*", go_http.NewMiddleware(
 		server.GetRegistry(), nil).
-		WrapHandler("GET /$", GetMyDefaultHandler(server, defaultWebRootDir, content)),
+		WrapHandler("GET /*", GetMyDefaultHandler(server, defaultWebRootDir, content)),
 	)
 	server.StartServer()
 }
