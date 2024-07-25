@@ -54,4 +54,10 @@ export function setupTerminal(element: HTMLDivElement) {
       fitAddon.fit();
     };
   };
+  ws.onerror = function(event) {
+    term.write("ws \x1B[1;3;31merror\x1B[0m $ event, disconnected from server... ", () => {
+      console.log(serializeAddon.serialize());
+    });
+    console.log(event);
+  }
 }

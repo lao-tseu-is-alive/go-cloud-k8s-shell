@@ -1,10 +1,10 @@
 package main
 
 import (
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/go_http"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttp"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/info"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/tools"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
@@ -29,7 +29,7 @@ const (
 	msgRespNotExpected              = "Response should contain what was expected."
 )
 
-var l *log.Logger
+var l golog.MyLogger
 
 type TestMainStruct struct {
 	name                         string
@@ -46,7 +46,7 @@ type TestMainStruct struct {
 func TestGoHttpServerInfoHandler(t *testing.T) {
 	var nameParameter string
 	listenAddr := fmt.Sprintf(":%d", defaultPort)
-	myServer := go_http.NewGoHttpServer(listenAddr, l)
+	myServer := gohttp.NewGoHttpServer(listenAddr, l)
 	ts := httptest.NewServer(GetInfoHandler(myServer))
 	defer ts.Close()
 
@@ -95,8 +95,8 @@ func TestGoHttpServerInfoHandler(t *testing.T) {
 				tt.r.URL.RawQuery = parameters.Encode()
 			}
 			resp, err := http.DefaultClient.Do(tt.r)
-			l.Printf(fmtTraceInfo, tt.name, tt.r.Method, tt.r.URL)
-			defer go_http.CloseBody(resp.Body, tt.name, l)
+			l.Debug(fmtTraceInfo, tt.name, tt.r.Method, tt.r.URL)
+			defer gohttp.CloseBody(resp.Body, tt.name, l)
 			if err != nil {
 				fmt.Printf(fmtErr, err, resp.Body)
 				t.Fatal(err)
@@ -104,7 +104,7 @@ func TestGoHttpServerInfoHandler(t *testing.T) {
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
 			receivedJson, _ := io.ReadAll(resp.Body)
 			rInfo := &info.RuntimeInfo{}
-			l.Println("param name : % v", nameParameter)
+			l.Debug("param name : % v", nameParameter)
 			tools.PrintWantedReceived(tt.wantBody, receivedJson, l)
 			if tt.wantStatusCode == http.StatusOK {
 				err = json.Unmarshal(receivedJson, rInfo)
@@ -112,147 +112,6 @@ func TestGoHttpServerInfoHandler(t *testing.T) {
 			}
 			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
 			assert.Contains(t, string(receivedJson), tt.wantBody, msgRespNotExpected)
-		})
-	}
-}
-
-func TestGetJsonFromUrl(t *testing.T) {
-
-	l := log.New(os.Stdout, version.APP, log.Lshortfile)
-	const authToken = "test-token"
-	expectedBody := `{"key": "value"}`
-	// Create a mock server
-	mockServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != fmt.Sprintf("Bearer %s", authToken) {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write([]byte(expectedBody))
-		if err != nil {
-			t.Fatalf("Error writing response: %v", err)
-			return
-		}
-	}))
-	defer mockServer.Close()
-
-	// Create a CA cert pool with the server's certificate
-	caCertPool := x509.NewCertPool()
-	caCertPool.AddCert(mockServer.Certificate())
-
-	// Create a mock server that will be closed to simulate a connection error
-	mockServerClosed := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// just an empty mock server that will be closed
-	}))
-	// Create a CA cert pool with the server's certificate
-	caCertPoolClosed := x509.NewCertPool()
-	caCertPoolClosed.AddCert(mockServerClosed.Certificate())
-	mockServerClosed.Close()
-
-	// Create a mock server ReadError
-	mockServerReadError := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Simulate a partial write followed by a read error
-		w.Header().Set("Content-Length", "1024")
-		_, err := w.Write([]byte(expectedBody))
-		if err != nil {
-			t.Fatalf("Error writing response: %v", err)
-			return
-		}
-
-		// Close the connection prematurely to cause a read error
-		conn, _, _ := w.(http.Hijacker).Hijack()
-		err = conn.Close()
-		if err != nil {
-			t.Fatalf("Error closing connection: %v", err)
-			return
-		}
-		// Close the connection immediately to cause a read error
-		//w.(http.Flusher).Flush()
-		//w.(http.CloseNotifier).CloseNotify()
-	}))
-	defer mockServerReadError.Close()
-
-	type args struct {
-		url           string
-		bearerToken   string
-		caCert        []byte
-		allowInsecure bool
-		logger        *log.Logger
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr assert.ErrorAssertionFunc
-	}{
-		{
-			name: "should return an error when the url is not reachable",
-			args: args{
-				url:           "http://remotehostthatwillnotexist:9999",
-				bearerToken:   authToken,
-				caCert:        nil,
-				allowInsecure: false,
-				logger:        l,
-			},
-			want:    "",
-			wantErr: assert.Error,
-		},
-		{
-			name: "should return status 200 ok when the url is reachable",
-			args: args{
-				url:           mockServer.URL,
-				bearerToken:   authToken,
-				caCert:        mockServer.Certificate().Raw,
-				allowInsecure: true,
-				logger:        l,
-			},
-			want:    expectedBody,
-			wantErr: assert.NoError,
-		},
-		{
-			name: "should return an error when the url is reachable but the token is invalid",
-			args: args{
-				url:           mockServer.URL,
-				bearerToken:   "",
-				caCert:        mockServer.Certificate().Raw,
-				allowInsecure: true,
-				logger:        l,
-			},
-			want:    "",
-			wantErr: assert.Error,
-		},
-		{
-			name: "should return an error when the url is reachable but the connection is refused",
-			args: args{
-				url:           mockServerClosed.URL,
-				bearerToken:   authToken,
-				caCert:        mockServerClosed.Certificate().Raw,
-				allowInsecure: true,
-				logger:        l,
-			},
-			want:    "",
-			wantErr: assert.Error,
-		},
-		{
-			name: "should return an error when the url is reachable but response cannot be read",
-			args: args{
-				url:           mockServerReadError.URL,
-				bearerToken:   authToken,
-				caCert:        nil,
-				allowInsecure: true,
-				logger:        l,
-			},
-			want:    "",
-			wantErr: assert.Error,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := info.GetJsonFromUrl(tt.args.url, tt.args.bearerToken, tt.args.caCert, tt.args.allowInsecure, 10*time.Second, tt.args.logger)
-			if !tt.wantErr(t, err, fmt.Sprintf("GetJsonFromUrl(%v, %v, %v, %v)", tt.args.url, tt.args.bearerToken, tt.args.caCert, tt.args.logger)) {
-				return
-			}
-			assert.Equalf(t, tt.want, got, "GetJsonFromUrl(%v, %v, %v, %v)", tt.args.url, tt.args.bearerToken, tt.args.caCert, tt.args.logger)
 		})
 	}
 }
@@ -280,14 +139,14 @@ func newRequest(t *testing.T, method, url, body string, useFormUrlencodedContent
 		t.Fatalf(fmtErrNewRequest, method, url, err)
 	}
 	if method == http.MethodPost && useFormUrlencodedContentType {
-		r.Header.Set(go_http.HeaderContentType, "Application/x-www-form-urlencoded")
+		r.Header.Set(gohttp.HeaderContentType, "Application/x-www-form-urlencoded")
 	} else {
-		r.Header.Set(go_http.HeaderContentType, go_http.MIMEAppJSON)
+		r.Header.Set(gohttp.HeaderContentType, gohttp.MIMEAppJSON)
 	}
 	return r
 }
 
-func executeTest(t *testing.T, tt TestMainStruct, listenAddr string, l *log.Logger) {
+func executeTest(t *testing.T, tt TestMainStruct, listenAddr string, l golog.MyLogger) {
 	t.Run(tt.name, func(t *testing.T) {
 		// prepare the request for this test case
 		r := newRequest(t, tt.httpMethod, listenAddr+tt.url, tt.body, tt.useFormUrlencodedContentType)
@@ -298,19 +157,19 @@ func executeTest(t *testing.T, tt TestMainStruct, listenAddr string, l *log.Logg
 			}
 			r.URL.RawQuery = parameters.Encode()
 		}
-		l.Printf(fmtTraceInfo, tt.name, tt.httpMethod, tt.url)
+		l.Debug(fmtTraceInfo, tt.name, tt.httpMethod, tt.url)
 		resp, err := http.DefaultClient.Do(r)
 		if err != nil {
 			fmt.Printf(fmtErr, err, resp.Body)
 			t.Fatal(err)
 		}
-		defer go_http.CloseBody(resp.Body, tt.name, l)
+		defer gohttp.CloseBody(resp.Body, tt.name, l)
 		assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
 		receivedJson, _ := io.ReadAll(resp.Body)
 		rInfo := &info.RuntimeInfo{}
 		tools.PrintWantedReceived(tt.wantBody, receivedJson, l)
 		if tt.wantStatusCode == http.StatusOK {
-			if tt.contentType == go_http.MIMEAppJSON {
+			if tt.contentType == gohttp.MIMEAppJSON {
 				err = json.Unmarshal(receivedJson, rInfo)
 				assert.Nil(t, err, "the output should be a valid json")
 			}
@@ -328,13 +187,13 @@ func TestMainExecution(t *testing.T) {
 	// starting main in his own go routine
 	var wg sync.WaitGroup
 	startMainServer(&wg)
-	go_http.WaitForHttpServer(listenAddr, 1*time.Second, 10)
+	gohttp.WaitForHttpServer(listenAddr, 1*time.Second, 10)
 
 	tests := []TestMainStruct{
 		{
 			name:                         "Get on default get handler should contain the App name",
 			wantStatusCode:               http.StatusOK,
-			contentType:                  go_http.MIMEHtml,
+			contentType:                  gohttp.MIMEHtml,
 			wantBody:                     version.APP,
 			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodGet,
@@ -345,7 +204,7 @@ func TestMainExecution(t *testing.T) {
 		{
 			name:                         "Post on default get handler should return an http error method not allowed ",
 			wantStatusCode:               http.StatusMethodNotAllowed,
-			contentType:                  go_http.MIMEAppJSON,
+			contentType:                  gohttp.MIMEAppJSON,
 			wantBody:                     "Method Not Allowed",
 			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodPost,
@@ -356,7 +215,7 @@ func TestMainExecution(t *testing.T) {
 		{
 			name:                         "Get on nonexistent route should return an http error not found ",
 			wantStatusCode:               http.StatusNotFound,
-			contentType:                  go_http.MIMEAppJSON,
+			contentType:                  gohttp.MIMEAppJSON,
 			wantBody:                     "page not found",
 			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodGet,
@@ -367,7 +226,7 @@ func TestMainExecution(t *testing.T) {
 		{
 			name:                         "Get on default Server Path should return a valid html containing app",
 			wantStatusCode:               http.StatusOK,
-			contentType:                  go_http.MIMEHtml,
+			contentType:                  gohttp.MIMEHtml,
 			wantBody:                     version.APP,
 			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodGet,
@@ -378,7 +237,7 @@ func TestMainExecution(t *testing.T) {
 		{
 			name:                         "/health Post should return an http error method not allowed ",
 			wantStatusCode:               http.StatusMethodNotAllowed,
-			contentType:                  go_http.MIMEAppJSON,
+			contentType:                  gohttp.MIMEAppJSON,
 			wantBody:                     "",
 			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodPost,
@@ -389,7 +248,7 @@ func TestMainExecution(t *testing.T) {
 		{
 			name:                         "/readiness Post should return an http error method not allowed ",
 			wantStatusCode:               http.StatusMethodNotAllowed,
-			contentType:                  go_http.MIMEAppJSON,
+			contentType:                  gohttp.MIMEAppJSON,
 			wantBody:                     "",
 			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodPost,
@@ -400,7 +259,7 @@ func TestMainExecution(t *testing.T) {
 		{
 			name:                         "/time Post should return an http error method not allowed ",
 			wantStatusCode:               http.StatusMethodNotAllowed,
-			contentType:                  go_http.MIMEAppJSON,
+			contentType:                  gohttp.MIMEAppJSON,
 			wantBody:                     "",
 			paramKeyValues:               make(map[string]string),
 			httpMethod:                   http.MethodPost,
@@ -416,9 +275,16 @@ func TestMainExecution(t *testing.T) {
 }
 
 func init() {
+	var err error
 	if DEBUG {
-		l = log.New(os.Stdout, fmt.Sprintf("testing_%s ", version.APP), log.Ldate|log.Ltime|log.Lshortfile)
+		l, err = golog.NewLogger("zap", golog.DebugLevel, fmt.Sprintf("test_%s ", version.APP))
+		if err != nil {
+			log.Fatalf("💥💥 error golog.NewLogger error: %v'\n", err)
+		}
 	} else {
-		l = log.New(io.Discard, version.APP, 0)
+		l, err = golog.NewLogger("zap", golog.ErrorLevel, fmt.Sprintf("test_%s ", version.APP))
+		if err != nil {
+			log.Fatalf("💥💥 error golog.NewLogger error: %v'\n", err)
+		}
 	}
 }
