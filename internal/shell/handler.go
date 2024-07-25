@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/creack/pty"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttp"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -28,18 +29,19 @@ type HandlerOpts struct {
 	// ConnectionErrorLimit defines the number of consecutive errors that can happen
 	// before a connection is considered unusable
 	ConnectionErrorLimit int
-	// CreateLogger when specified should return a logger that the handler will use.
-	// The string argument being passed in will be a unique identifier for the
-	// current connection. When not specified, logs will be sent to stdout
-	CreateLogger func(string, *http.Request) Logger
+	Logger               golog.MyLogger
 	// KeepalivePingTimeout defines the maximum duration between which a ping and pong
 	// cycle should be tolerated, beyond this the connection should be deemed dead
 	KeepalivePingTimeout time.Duration
 	MaxBufferSizeBytes   int
 }
 
-func GetHandler(opts HandlerOpts) func(http.ResponseWriter, *http.Request) {
+func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
+	handlerName := "GetShellHandler"
+	opts.Logger.Info("INITIAL CALL TO %s", handlerName)
 	return func(w http.ResponseWriter, r *http.Request) {
+		clog := opts.Logger
+		gohttp.TraceRequest(handlerName, r, clog)
 		connectionErrorLimit := opts.ConnectionErrorLimit
 		if connectionErrorLimit < 0 {
 			connectionErrorLimit = DefaultConnectionErrorLimit
@@ -49,54 +51,45 @@ func GetHandler(opts HandlerOpts) func(http.ResponseWriter, *http.Request) {
 		if keepalivePingTimeout <= time.Second {
 			keepalivePingTimeout = 20 * time.Second
 		}
-
-		connectionUUID, err := uuid.NewUUID()
-		if err != nil {
-			message := "failed to get a connection uuid"
-			log.Errorf("%s: %s", message, err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(message))
-			return
-		}
-		var clog Logger = defaultLogger
-		if opts.CreateLogger != nil {
-			clog = opts.CreateLogger(connectionUUID.String(), r)
-		}
 		clog.Info("established connection identity")
 
 		allowedHostnames := opts.AllowedHostnames
-		upgrader := getConnectionUpgrader(allowedHostnames, maxBufferSizeBytes, clog)
-		connection, err := upgrader.Upgrade(w, r, nil)
+		upgrade := getConnectionUpgrade(allowedHostnames, maxBufferSizeBytes, clog)
+		connection, err := upgrade.Upgrade(w, r, nil)
 		if err != nil {
-			clog.Warnf("failed to upgrade connection: %s", err)
+			clog.Warn("failed to upgrade connection: %s", err)
 			return
 		}
 
 		terminal := opts.Command
 		args := opts.Arguments
-		clog.Debugf("starting new tty using command '%s' with arguments ['%s']...", terminal, strings.Join(args, "', '"))
+		clog.Debug("starting new tty using command '%s' with arguments ['%s']...", terminal, strings.Join(args, "', '"))
 		cmd := exec.Command(terminal, args...)
 		cmd.Env = os.Environ()
 		tty, err := pty.Start(cmd)
 		if err != nil {
 			message := fmt.Sprintf("failed to start tty: %s", err)
 			clog.Warn(message)
-			connection.WriteMessage(websocket.TextMessage, []byte(message))
+			err := connection.WriteMessage(websocket.TextMessage, []byte(message))
+			if err != nil {
+				clog.Warn("failed to send error message to xterm.js: %s", err)
+				return
+			}
 			return
 		}
 		defer func() {
 			clog.Info("gracefully stopping spawned tty...")
 			if err := cmd.Process.Kill(); err != nil {
-				clog.Warnf("failed to kill process: %s", err)
+				clog.Warn("failed to kill process: %s", err)
 			}
 			if _, err := cmd.Process.Wait(); err != nil {
-				clog.Warnf("failed to wait for process to exit: %s", err)
+				clog.Warn("failed to wait for process to exit: %s", err)
 			}
 			if err := tty.Close(); err != nil {
-				clog.Warnf("failed to close spawned tty gracefully: %s", err)
+				clog.Warn("failed to close spawned tty gracefully: %s", err)
 			}
 			if err := connection.Close(); err != nil {
-				clog.Warnf("failed to close webscoket connection: %s", err)
+				clog.Warn("failed to close webscoket connection: %s", err)
 			}
 		}()
 
@@ -140,19 +133,19 @@ func GetHandler(opts HandlerOpts) func(http.ResponseWriter, *http.Request) {
 				buffer := make([]byte, maxBufferSizeBytes)
 				readLength, err := tty.Read(buffer)
 				if err != nil {
-					clog.Warnf("failed to read from tty: %s", err)
+					clog.Warn("failed to read from tty: %s", err)
 					if err := connection.WriteMessage(websocket.TextMessage, []byte("bye!")); err != nil {
-						clog.Warnf("failed to send termination message from tty to xterm.js: %s", err)
+						clog.Warn("failed to send termination message from tty to xterm.js: %s", err)
 					}
 					waiter.Done()
 					return
 				}
 				if err := connection.WriteMessage(websocket.BinaryMessage, buffer[:readLength]); err != nil {
-					clog.Warnf("failed to send %v bytes from tty to xterm.js", readLength)
+					clog.Warn("failed to send %v bytes from tty to xterm.js", readLength)
 					errorCounter++
 					continue
 				}
-				clog.Tracef("sent message of size %v bytes from tty to xterm.js", readLength)
+				clog.Debug("sent message of size %v bytes from tty to xterm.js", readLength)
 				errorCounter = 0
 			}
 		}()
@@ -164,7 +157,7 @@ func GetHandler(opts HandlerOpts) func(http.ResponseWriter, *http.Request) {
 				messageType, data, err := connection.ReadMessage()
 				if err != nil {
 					if !connectionClosed {
-						clog.Warnf("failed to get next reader: %s", err)
+						clog.Warn("failed to get next reader: %s", err)
 					}
 					return
 				}
@@ -174,7 +167,7 @@ func GetHandler(opts HandlerOpts) func(http.ResponseWriter, *http.Request) {
 				if !ok {
 					dataType = "uunknown"
 				}
-				clog.Infof("received %s (type: %v) message of size %v byte(s) from xterm.js with key sequence: %v", dataType, messageType, dataLength, dataBuffer)
+				clog.Info("received %s (type: %v) message of size %v byte(s) from xterm.js with key sequence: %v", dataType, messageType, dataLength, dataBuffer)
 
 				// process
 				if dataLength == -1 { // invalid
@@ -188,15 +181,15 @@ func GetHandler(opts HandlerOpts) func(http.ResponseWriter, *http.Request) {
 						ttySize := &TTYSize{}
 						resizeMessage := bytes.Trim(dataBuffer[1:], " \n\r\t\x00\x01")
 						if err := json.Unmarshal(resizeMessage, ttySize); err != nil {
-							clog.Warnf("failed to unmarshal received resize message '%s': %s", string(resizeMessage), err)
+							clog.Warn("failed to unmarshal received resize message '%s': %s", string(resizeMessage), err)
 							continue
 						}
-						clog.Infof("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols)
+						clog.Info("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols)
 						if err := pty.Setsize(tty, &pty.Winsize{
 							Rows: ttySize.Rows,
 							Cols: ttySize.Cols,
 						}); err != nil {
-							clog.Warnf("failed to resize tty, error: %s", err)
+							clog.Warn("failed to resize tty, error: %s", err)
 						}
 						continue
 					}
@@ -208,12 +201,12 @@ func GetHandler(opts HandlerOpts) func(http.ResponseWriter, *http.Request) {
 					clog.Warn(fmt.Sprintf("failed to write %v bytes to tty: %s", len(dataBuffer), err))
 					continue
 				}
-				clog.Tracef("%v bytes written to tty...", bytesWritten)
+				clog.Debug("%v bytes written to tty...", bytesWritten)
 			}
 		}()
 
 		waiter.Wait()
-		log.Info("closing connection...")
+		clog.Info("closing connection...")
 		connectionClosed = true
 	}
 }

@@ -7,7 +7,7 @@ import {AttachAddon} from "@xterm/addon-attach";
 
 export function setupTerminal(element: HTMLDivElement) {
   const protocol = (location.protocol === "https:") ? "wss://" : "ws://";
-  const url = protocol + location.host + "/go-shell"
+  const url = protocol + location.host + "/goshell"
   const ws = new WebSocket(url);
   const term = new Terminal({
     allowProposedApi: true,

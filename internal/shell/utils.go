@@ -1,16 +1,17 @@
 package shell
 
 import (
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/websocket"
 )
 
-func getConnectionUpgrader(
+func getConnectionUpgrade(
 	allowedHostnames []string,
 	maxBufferSizeBytes int,
-	logger Logger,
+	logger golog.MyLogger,
 ) websocket.Upgrader {
 	return websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -23,7 +24,7 @@ func getConnectionUpgrader(
 					return true
 				}
 			}
-			logger.Warnf("failed to find '%s' in the list of allowed hostnames ('%s')", requesterHostname)
+			logger.Warn("failed to find '%s' in the list of allowed hostnames ('%s')", requesterHostname)
 			return false
 		},
 		HandshakeTimeout: 0,

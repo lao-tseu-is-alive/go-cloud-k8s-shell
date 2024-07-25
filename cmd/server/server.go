@@ -7,6 +7,7 @@ import (
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttp"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/info"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/internal/shell"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
 	"github.com/rs/xid"
 	"io/fs"
@@ -21,6 +22,12 @@ const (
 	defaultServerIp   = "127.0.0.1"
 	defaultServerPath = "/"
 	defaultWebRootDir = "front/dist/"
+)
+
+var (
+	allowedHosts = []string{"localhost"}
+	command      = "/bin/bash"
+	args         = []string{""}
 )
 
 // content holds our static web server content.
@@ -100,6 +107,15 @@ func main() {
 	// using new server Mux in Go 1.22 https://pkg.go.dev/net/http#ServeMux
 	mux := server.GetRouter()
 	mux.Handle("GET /info", GetInfoHandler(server))
+	mux.Handle("GET /goshell", shell.GetShellHandler(shell.HandlerOpts{
+		AllowedHostnames:     allowedHosts,
+		Arguments:            args,
+		Command:              command,
+		ConnectionErrorLimit: 5,
+		Logger:               l,
+		KeepalivePingTimeout: time.Second * 20,
+		MaxBufferSizeBytes:   512,
+	}))
 	mux.Handle("GET /*", gohttp.NewMiddleware(
 		server.GetRegistry(), nil).
 		WrapHandler("GET /*", GetMyDefaultHandler(server, defaultWebRootDir, content)),
