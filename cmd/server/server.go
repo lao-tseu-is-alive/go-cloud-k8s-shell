@@ -107,7 +107,7 @@ func main() {
 	// using new server Mux in Go 1.22 https://pkg.go.dev/net/http#ServeMux
 	mux := server.GetRouter()
 	mux.Handle("GET /info", GetInfoHandler(server))
-	mux.Handle("/goshell", shell.GetShellHandler(shell.HandlerOpts{
+	mux.Handle("GET /goshell", shell.GetShellHandler(shell.HandlerOpts{
 		AllowedHostnames:     allowedHosts,
 		Arguments:            args,
 		Command:              command,
@@ -116,9 +116,9 @@ func main() {
 		KeepalivePingTimeout: time.Second * 200,
 		MaxBufferSizeBytes:   512,
 	}))
-	mux.Handle("GET /home", gohttp.NewMiddleware(
+	mux.Handle("GET /*", gohttp.NewMiddleware(
 		server.GetRegistry(), nil).
-		WrapHandler("GET /home", GetMyDefaultHandler(server, defaultWebRootDir, content)),
+		WrapHandler("GET /*", GetMyDefaultHandler(server, defaultWebRootDir, content)),
 	)
 	server.StartServer()
 }
