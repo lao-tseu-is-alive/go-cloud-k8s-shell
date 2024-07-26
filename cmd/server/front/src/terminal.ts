@@ -4,10 +4,13 @@ import { SerializeAddon } from "@xterm/addon-serialize";
 import { Unicode11Addon  } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import {AttachAddon} from "@xterm/addon-attach";
+import { BGred, yellow, bright, reset} from "./consoleColors.ts";
 
 export function setupTerminal(element: HTMLDivElement) {
   const protocol = (location.protocol === "https:") ? "wss://" : "ws://";
-  const url = protocol + location.host + "/goshell"
+  //const url = protocol + location.host + "/goshell"
+  const url = protocol + "localhost:9999/goshell"
+  //const url = protocol + "localhost:8376/xterm.js"
   const ws = new WebSocket(url);
   const term = new Terminal({
     allowProposedApi: true,
@@ -19,7 +22,7 @@ export function setupTerminal(element: HTMLDivElement) {
   const unicode11Addon = new Unicode11Addon();
   const serializeAddon = new SerializeAddon();
   const webLinksAddon = new WebLinksAddon();
-  const attachAddon = new AttachAddon(ws);
+  const attachAddon = new AttachAddon(ws, { bidirectional: true });
   term.loadAddon(fitAddon);
   term.loadAddon(unicode11Addon);
   term.loadAddon(serializeAddon);
@@ -28,14 +31,11 @@ export function setupTerminal(element: HTMLDivElement) {
   // activate the new version
   term.open(element);
   fitAddon.fit();
-  term.write("Hello from \x1B[1;3;31mxterm.js\x1B[0m $ World!", () => {
+  /*term.write("Hello from \x1B[1;3;31mxterm.js\x1B[0m $ World!", () => {
     console.log(serializeAddon.serialize());
-  });
+  });*/
   //element.addEventListener('click', () => setCounter(counter + 1))
   ws.onopen = function() {
-    term.write("ws \x1B[1;3;31mopen\x1B[0m $ event ", () => {
-      console.log(serializeAddon.serialize());
-    });
     term.loadAddon(attachAddon);
     term.focus();
     setTimeout(function() {fitAddon.fit()});
@@ -55,7 +55,15 @@ export function setupTerminal(element: HTMLDivElement) {
     };
   };
   ws.onerror = function(event) {
-    term.write("ws \x1B[1;3;31merror\x1B[0m $ event, disconnected from server... ", () => {
+    console.log("ws.onerror event:", event);
+    term.write(`💥💥 ${BGred} ${bright} ${yellow} Websocket ERROR EVENT, disconnected from server... ${reset} \r\n`, () => {
+      console.log(serializeAddon.serialize());
+    });
+    console.log(event);
+  }
+  ws.onclose = function(event) {
+    console.log("ws.onclose event:", event);
+    term.write(`\r\n💥💥 ${BGred} ${bright} ${yellow} Websocket CLOSE EVENT, disconnected from server... ${reset} \r\n`, () => {
       console.log(serializeAddon.serialize());
     });
     console.log(event);

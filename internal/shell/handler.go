@@ -66,6 +66,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		clog.Debug("starting new tty using command '%s' with arguments ['%s']...", terminal, strings.Join(args, "', '"))
 		cmd := exec.Command(terminal, args...)
 		cmd.Env = os.Environ()
+		clog.Info("executing command '%s' with arguments ['%s']...", terminal, strings.Join(args, "', '"))
 		tty, err := pty.Start(cmd)
 		if err != nil {
 			message := fmt.Sprintf("failed to start tty: %s", err)
@@ -77,6 +78,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 			}
 			return
 		}
+		clog.Info("pty.Start done....")
 		defer func() {
 			clog.Info("gracefully stopping spawned tty...")
 			if err := cmd.Process.Kill(); err != nil {
@@ -96,7 +98,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		var connectionClosed bool
 		var waiter sync.WaitGroup
 		waiter.Add(1)
-
+		clog.Info("establishing Pong handler for keep-alive loop...")
 		// this is a keep-alive loop that ensures connection does not hang-up itself
 		lastPongTime := time.Now()
 		connection.SetPongHandler(func(msg string) error {
@@ -133,7 +135,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 				buffer := make([]byte, maxBufferSizeBytes)
 				readLength, err := tty.Read(buffer)
 				if err != nil {
-					clog.Warn("failed to read from tty: %s", err)
+					clog.Warn(" 🚩 failed to read from tty: %s", err)
 					if err := connection.WriteMessage(websocket.TextMessage, []byte("bye!")); err != nil {
 						clog.Warn("failed to send termination message from tty to xterm.js: %s", err)
 					}
@@ -165,7 +167,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 				dataBuffer := bytes.Trim(data, "\x00")
 				dataType, ok := WebsocketMessageType[messageType]
 				if !ok {
-					dataType = "uunknown"
+					dataType = "unknown"
 				}
 				clog.Info("received %s (type: %v) message of size %v byte(s) from xterm.js with key sequence: %v", dataType, messageType, dataLength, dataBuffer)
 

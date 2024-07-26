@@ -19,7 +19,7 @@ import (
 
 const (
 	defaultPort       = 9999
-	defaultServerIp   = "127.0.0.1"
+	defaultServerIp   = "0.0.0.0"
 	defaultServerPath = "/"
 	defaultWebRootDir = "front/dist/"
 )
@@ -27,7 +27,7 @@ const (
 var (
 	allowedHosts = []string{"localhost"}
 	command      = "/bin/bash"
-	args         = []string{""}
+	args         []string
 )
 
 // content holds our static web server content.
@@ -96,7 +96,7 @@ func main() {
 		log.Fatalf("💥💥 ERROR: 'calling GetPortFromEnv got error: %v'\n", err)
 	}
 	listenAddr = defaultServerIp + listenAddr
-	l, err := golog.NewLogger("zap", golog.DebugLevel, version.APP)
+	l, err := golog.NewLogger("zap", golog.DebugLevel, fmt.Sprintf("%s ", version.APP))
 	if err != nil {
 		log.Fatalf("💥💥 error log.NewLogger error: %v'\n", err)
 	}
@@ -107,18 +107,18 @@ func main() {
 	// using new server Mux in Go 1.22 https://pkg.go.dev/net/http#ServeMux
 	mux := server.GetRouter()
 	mux.Handle("GET /info", GetInfoHandler(server))
-	mux.Handle("GET /goshell", shell.GetShellHandler(shell.HandlerOpts{
+	mux.Handle("/goshell", shell.GetShellHandler(shell.HandlerOpts{
 		AllowedHostnames:     allowedHosts,
 		Arguments:            args,
 		Command:              command,
-		ConnectionErrorLimit: 5,
+		ConnectionErrorLimit: 10,
 		Logger:               l,
-		KeepalivePingTimeout: time.Second * 20,
+		KeepalivePingTimeout: time.Second * 200,
 		MaxBufferSizeBytes:   512,
 	}))
-	mux.Handle("GET /*", gohttp.NewMiddleware(
+	mux.Handle("GET /home", gohttp.NewMiddleware(
 		server.GetRegistry(), nil).
-		WrapHandler("GET /*", GetMyDefaultHandler(server, defaultWebRootDir, content)),
+		WrapHandler("GET /home", GetMyDefaultHandler(server, defaultWebRootDir, content)),
 	)
 	server.StartServer()
 }

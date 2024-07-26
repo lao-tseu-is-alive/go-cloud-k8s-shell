@@ -1,11 +1,10 @@
 package shell
 
 import (
+	"github.com/gorilla/websocket"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
 	"net/http"
 	"strings"
-
-	"github.com/gorilla/websocket"
 )
 
 func getConnectionUpgrade(
