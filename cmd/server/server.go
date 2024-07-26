@@ -7,7 +7,7 @@ import (
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttp"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/info"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/internal/shell"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/shell"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
 	"github.com/rs/xid"
 	"io/fs"
