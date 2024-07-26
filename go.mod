@@ -4,7 +4,6 @@ go 1.22.5
 
 require (
 	github.com/creack/pty v1.1.21
-	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/lao-tseu-is-alive/go-cloud-k8s-common v0.2.1
 	github.com/rs/xid v1.5.0
