@@ -6,12 +6,14 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import {AttachAddon} from "@xterm/addon-attach";
 import { BGred, yellow, bright, reset} from "./consoleColors.ts";
 
-export function setupTerminal(element: HTMLDivElement) {
+
+
+export function setupTerminal(element: HTMLDivElement, token: string ) {
   const protocol = (location.protocol === "https:") ? "wss://" : "ws://";
   //const url = protocol + location.host + "/goshell"
   const url = protocol + "localhost:9999/goshell"
-  //const url = protocol + "localhost:8376/xterm.js"
-  const ws = new WebSocket(url);
+  const ws = new WebSocket(url, ["Authorization", `Bearer ${token}`]);
+
   const term = new Terminal({
     allowProposedApi: true,
     cursorBlink: true,

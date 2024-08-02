@@ -25,6 +25,15 @@ jobs:
       run: go build -v ./...
 
     - name: Test
+      env:
+        PORT: 9999
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        JWT_ISSUER_ID: ${{ secrets.JWT_ISSUER_ID }}
+        JWT_DURATION_MINUTES: 240
+        ADMIN_USER: ${{ secrets.ADMIN_USER }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+        ADMIN_ID: ${{ secrets.ADMIN_ID }}
       run: go test -coverprofile coverage.out -v ./...
 
     - name: Upload coverage to Codecov

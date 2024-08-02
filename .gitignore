@@ -25,3 +25,5 @@ go_admin_credentials_secrets
 /server
 /secret/
 /cmd/server/go-cloud-k8s-shell-front/
+/.env
+/.env_for_github.txt

@@ -39,6 +39,15 @@ jobs:
           go-version: 1.22
 
       - name: Test and coverage
+        env:
+          PORT: 9999
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ISSUER_ID: ${{ secrets.JWT_ISSUER_ID }}
+          JWT_DURATION_MINUTES: 240
+          ADMIN_USER: ${{ secrets.ADMIN_USER }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_ID: ${{ secrets.ADMIN_ID }}
         run: go test -race -covermode=atomic -coverprofile=coverage.out -v ./...
 
       - name: Upload coverage to Codecov

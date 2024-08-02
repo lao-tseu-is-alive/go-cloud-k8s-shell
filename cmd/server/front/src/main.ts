@@ -1,5 +1,6 @@
 import "./skeleton.css";
 import "@xterm/xterm/css/xterm.css";
+import sha256 from "crypto-js/sha256";
 
 import { setupTerminal } from "./terminal.ts";
 
@@ -8,6 +9,27 @@ const html = `
   <section class="header">
      <h5>goCloudK8sShell</h5>
   </section>  
+  <form method="post" action="/login" id="loginForm">
+        <div class="row">
+            <div class="six columns">
+                <label for="login">Login:</label><br/>
+                <input id="login" type="text" name="login" value="" class="u-full-width">
+            </div>
+            <div class="six columns">
+                <label for="password">Password:</label><br/>
+                <input id="password" type="password"
+                       placeholder="Enter your password here" class="u-full-width">
+                <input type="hidden" id="hashed" name="hashed" >
+            </div>
+        </div>
+        <input type="submit" class="u-pull-right">
+    </form>
+    <div class="row">
+        <div class="twelve columns">
+            <div id="msg"></div>
+        </div>
+    </div>
+  <div class="row">
   <div class="row">
     <div class="twelve columns">
       <div id="terminal"></div>
@@ -16,6 +38,45 @@ const html = `
 </div>
 
 `;
-
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = html;
-setupTerminal(document.querySelector<HTMLDivElement>("#terminal")!);
+// if token is null, display login form
+const loginForm:HTMLFormElement = document.getElementById("loginForm")! as HTMLFormElement;
+const msg = document.getElementById("msg")!;
+let token = null;
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  console.log("in loginForm submit event :", e)
+  const inputPassword:HTMLInputElement = document.getElementById("password")! as HTMLInputElement;
+  const hashedPassword = sha256(inputPassword.value);
+  const inputHashedPassword:HTMLInputElement = document.getElementById("hashed")! as HTMLInputElement;
+  inputHashedPassword.value = hashedPassword;
+  console.log("hashedPassword", hashedPassword);
+  //const inputs = loginForm.elements;
+  if ((inputHashedPassword.value.length > 0) && (inputPassword.value.length > 0)) {
+    const data = new FormData(loginForm);
+    console.log("data", data);
+    //const url = loginForm.action;
+    const url = "http://localhost:9999/login"
+    const response = await fetch(url, {
+      method: 'post',
+      body: data
+    });
+    if (!response.ok) {
+      const errorMessage = await response.text();
+      msg.innerHTML = `<h4>${errorMessage}</h4>`;
+    }
+    const jsonResponse = await response.json();
+    const niceToReadResponse = JSON.stringify(jsonResponse, null, 2);
+    if (Object.hasOwn(jsonResponse,'token')) {
+      token = jsonResponse['token'];
+      setupTerminal(document.querySelector<HTMLDivElement>("#terminal")!, token);
+    } else {
+      msg.innerHTML = `<h4> token key not found in ${niceToReadResponse}</h4>`;
+    }
+    console.log(jsonResponse);
+    msg.innerHTML = `response from server<pre>${niceToReadResponse}</pre>`;
+  } else {
+    msg.innerHTML = "<h4>Login and password values cannot be empty</h4>";
+  }
+});
+
