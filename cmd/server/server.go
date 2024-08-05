@@ -98,7 +98,7 @@ func main() {
 		Command:              command,
 		ConnectionErrorLimit: 10,
 		Logger:               l,
-		KeepalivePingTimeout: time.Second * 200,
+		KeepalivePingTimeout: time.Second * 60,
 		MaxBufferSizeBytes:   512,
 		JwtCheck:             myJwt,
 	}))

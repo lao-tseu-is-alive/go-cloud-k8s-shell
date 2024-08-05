@@ -7,7 +7,7 @@ import { setupTerminal } from "./terminal.ts";
 const html = `
 <div class="container">
   <section class="header">
-     <h5>goCloudK8sShell</h5>
+     <h5><a href="https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell" >goCloudK8sShell</a></h5>
   </section>  
   <form method="post" action="/login" id="loginForm">
         <div class="row">
@@ -24,7 +24,7 @@ const html = `
         </div>
         <input type="submit" class="u-pull-right">
     </form>
-    <div class="row">
+    <div class="row" id="divMsg">
         <div class="twelve columns">
             <div id="msg"></div>
         </div>
@@ -42,21 +42,23 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = html;
 // if token is null, display login form
 const loginForm:HTMLFormElement = document.getElementById("loginForm")! as HTMLFormElement;
 const msg = document.getElementById("msg")!;
+const divMsg:HTMLDivElement = document.querySelector<HTMLDivElement>("#divMsg")!;
 let token = null;
+const serverHost = window.location.port === "5173" ? "localhost:9999" : window.location.host;
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   console.log("in loginForm submit event :", e)
   const inputPassword:HTMLInputElement = document.getElementById("password")! as HTMLInputElement;
   const hashedPassword = sha256(inputPassword.value);
   const inputHashedPassword:HTMLInputElement = document.getElementById("hashed")! as HTMLInputElement;
-  inputHashedPassword.value = hashedPassword;
+  inputHashedPassword.value = hashedPassword.toString();
   console.log("hashedPassword", hashedPassword);
   //const inputs = loginForm.elements;
   if ((inputHashedPassword.value.length > 0) && (inputPassword.value.length > 0)) {
     const data = new FormData(loginForm);
     console.log("data", data);
     //const url = loginForm.action;
-    const url = "http://localhost:9999/api/login"
+    const url = `http://${serverHost}/api/login`
     const response = await fetch(url, {
       method: 'post',
       body: data
@@ -67,8 +69,10 @@ loginForm.addEventListener('submit', async (e) => {
     }
     const jsonResponse = await response.json();
     const niceToReadResponse = JSON.stringify(jsonResponse, null, 2);
-    if (Object.hasOwn(jsonResponse,'token')) {
+    if ('token' in jsonResponse) {
       token = jsonResponse['token'];
+      loginForm.style.display = "none";
+      divMsg.style.display = "none";
       setupTerminal(document.querySelector<HTMLDivElement>("#terminal")!, token);
     } else {
       msg.innerHTML = `<h4> token key not found in ${niceToReadResponse}</h4>`;

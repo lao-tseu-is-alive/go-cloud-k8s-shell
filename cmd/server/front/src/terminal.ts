@@ -11,7 +11,8 @@ import { BGred, yellow, bright, reset} from "./consoleColors.ts";
 export function setupTerminal(element: HTMLDivElement, token: string ) {
   const protocol = (location.protocol === "https:") ? "wss://" : "ws://";
   //const url = protocol + location.host + "/goshell"
-  const url = `${protocol}127.0.0.1:9999/goshell?token=${token}`;
+  const serverHost = window.location.port === "5173" ? "127.0.0.1:9999" : window.location.host;
+  const url = `${protocol}${serverHost}/goshell?token=${token}`;
   //const ws = new WebSocket(url, ["Authorization", `${token}`]);
   const ws = new WebSocket(url, );
 

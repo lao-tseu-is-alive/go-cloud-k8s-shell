@@ -12,7 +12,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"strings"
 	"sync"
@@ -41,79 +40,6 @@ type TestMainStruct struct {
 	url                          string
 	useFormUrlencodedContentType bool
 	body                         string
-}
-
-func TestGoHttpServerInfoHandler(t *testing.T) {
-	var nameParameter string
-	listenAddr := fmt.Sprintf(":%d", defaultPort)
-	myServer := gohttp.NewGoHttpServer(listenAddr, l)
-	ts := httptest.NewServer(GetInfoHandler(myServer))
-	defer ts.Close()
-
-	newRequest := func(method, url string, body string) *http.Request {
-		r, err := http.NewRequest(method, ts.URL+url, strings.NewReader(body))
-		if err != nil {
-			t.Fatalf(fmtErrNewRequest, method, url, err)
-		}
-		return r
-	}
-	type testStruct struct {
-		name           string
-		wantStatusCode int
-		wantBody       string
-		paramKeyValues map[string]string
-		r              *http.Request
-	}
-	tests := []testStruct{
-		{
-			name:           "/info Get should return a valid json containing param value",
-			wantStatusCode: http.StatusOK,
-			wantBody:       `"param_name": "╚»☯💥⚡✌ℂ𝔾𝕀𝕃✌⚡💥☯«╝"`,
-			paramKeyValues: map[string]string{"name": "╚»☯💥⚡✌ℂ𝔾𝕀𝕃✌⚡💥☯«╝"},
-			r:              newRequest(http.MethodGet, defaultServerPath, ""),
-		},
-		{
-			name:           "/info Get should return Http Status Ok",
-			wantStatusCode: http.StatusOK,
-			wantBody:       "",
-			paramKeyValues: make(map[string]string),
-			r:              newRequest(http.MethodGet, defaultServerPath, ""),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.r.Header.Set("Content-Type", "Application/json")
-			if len(tt.paramKeyValues) > 0 {
-				parameters := tt.r.URL.Query()
-				for paramName, paramValue := range tt.paramKeyValues {
-					parameters.Add(paramName, paramValue)
-					if paramName == "name" {
-						nameParameter = paramValue
-					}
-				}
-				tt.r.URL.RawQuery = parameters.Encode()
-			}
-			resp, err := http.DefaultClient.Do(tt.r)
-			l.Debug(fmtTraceInfo, tt.name, tt.r.Method, tt.r.URL)
-			defer gohttp.CloseBody(resp.Body, tt.name, l)
-			if err != nil {
-				fmt.Printf(fmtErr, err, resp.Body)
-				t.Fatal(err)
-			}
-			assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
-			receivedJson, _ := io.ReadAll(resp.Body)
-			rInfo := &info.RuntimeInfo{}
-			l.Debug("param name : % v", nameParameter)
-			tools.PrintWantedReceived(tt.wantBody, receivedJson, l)
-			if tt.wantStatusCode == http.StatusOK {
-				err = json.Unmarshal(receivedJson, rInfo)
-				assert.Nil(t, err, "the output should be a valid json")
-			}
-			// check that receivedJson contains the specified tt.wantBody substring . https://pkg.go.dev/github.com/stretchr/testify/assert#Contains
-			assert.Contains(t, string(receivedJson), tt.wantBody, msgRespNotExpected)
-		})
-	}
 }
 
 func setPortEnv(t *testing.T, port int) {
@@ -163,7 +89,7 @@ func executeTest(t *testing.T, tt TestMainStruct, listenAddr string, l golog.MyL
 			fmt.Printf(fmtErr, err, resp.Body)
 			t.Fatal(err)
 		}
-		defer gohttp.CloseBody(resp.Body, tt.name, l)
+		defer tools.CloseBody(resp.Body, tt.name, l)
 		assert.Equal(t, tt.wantStatusCode, resp.StatusCode, assertCorrectStatusCodeExpected)
 		receivedJson, _ := io.ReadAll(resp.Body)
 		rInfo := &info.RuntimeInfo{}

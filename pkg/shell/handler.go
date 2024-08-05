@@ -3,6 +3,7 @@ package shell
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
@@ -12,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -105,140 +105,165 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 				clog.Warn("failed to close spawned tty gracefully: %s", err)
 			}
 			if err := connection.Close(); err != nil {
-				clog.Warn("failed to close webscoket connection: %s", err)
+				clog.Warn("failed to close websocket connection: %s", err)
 			}
+			clog.Info("tty and connection closed successfully")
 		}()
-
-		var connectionClosed bool
-		var waiter sync.WaitGroup
-		waiter.Add(1)
+		errChan := make(chan error, 3)
+		done := make(chan struct{})
 		clog.Info("establishing Pong handler for keep-alive loop...")
-		// this is a keep-alive loop that ensures connection does not hang-up itself
 		lastPongTime := time.Now()
 		connection.SetPongHandler(func(msg string) error {
 			lastPongTime = time.Now()
 			return nil
 		})
-		go func() {
+		infoCloseReason := ""
+		go func(errChan chan<- error, done <-chan struct{}) {
+			goRoutineName := "Ping-Goroutine"
+			defer clog.Info(fmt.Sprintf("%s : exiting...", goRoutineName))
 			for {
-				if connectionClosed {
-					clog.Info("connection is closed, exiting from tty >> xterm.js...")
+				select {
+				case <-done:
+					clog.Info(fmt.Sprintf("%s : connection is closed, exiting from tty >> xterm.js...", goRoutineName))
 					return
-				}
-				if err := connection.WriteMessage(websocket.PingMessage, []byte("keepalive")); err != nil {
-					clog.Warn("failed to write ping message")
-					return
-				}
-				time.Sleep(keepalivePingTimeout / 2)
-				if time.Now().Sub(lastPongTime) > keepalivePingTimeout {
-					clog.Warn("failed to get response from ping, triggering disconnect now...")
-					waiter.Done()
-					return
-				}
-				clog.Debug("received response from ping successfully")
-				if !claims.IsValidAt(time.Now()) {
-					clog.Warn("token has expired, triggering disconnect now...")
-					waiter.Done()
-					return
-				} else {
-					clog.Debug("token is still valid at %v, until %v", time.Now(), claims.ExpiresAt)
+				default:
+					if err := connection.WriteMessage(websocket.PingMessage, []byte("keepalive")); err != nil {
+						clog.Warn("Ping-Goroutine : failed to write ping message")
+						return
+					}
+					time.Sleep(keepalivePingTimeout / 2)
+					if time.Now().Sub(lastPongTime) > keepalivePingTimeout {
+						msg := fmt.Sprintf("%s : failed to get response from ping, triggering disconnect now...", goRoutineName)
+						clog.Warn(msg)
+						errChan <- errors.New(msg)
+						return
+					}
+					clog.Debug("received response from ping successfully")
+					if !claims.IsValidAt(time.Now()) {
+						msg := fmt.Sprintf("%s : token has expired, triggering disconnect now...", goRoutineName)
+						clog.Warn(msg)
+						infoCloseReason = "token has expired"
+						errChan <- errors.New(msg)
+						return
+					} else {
+						clog.Debug("%s : token is still valid until %v", goRoutineName, claims.ExpiresAt)
+					}
 				}
 			}
-		}()
+		}(errChan, done)
 
-		// tty >> xterm.js
-		go func() {
+		// sending bash tty terminal data ==> to client xterm.js
+		go func(errChan chan<- error, done <-chan struct{}) {
+			goRoutineName := "SendingToXTerm"
+			defer clog.Info(fmt.Sprintf("%s : exiting...", goRoutineName))
 			errorCounter := 0
 			for {
-				if connectionClosed {
-					clog.Info("connection is closed, exiting from tty >> xterm.js...")
+				select {
+				case <-done:
+					clog.Info(fmt.Sprintf("%s : connection is closed, exiting from tty >> xterm.js...", goRoutineName))
 					return
-				}
-				if errorCounter > connectionErrorLimit {
-					waiter.Done()
-					break
-				}
-				buffer := make([]byte, maxBufferSizeBytes)
-				readLength, err := tty.Read(buffer)
-				if err != nil {
-					clog.Warn(" 🚩 failed to read from tty: %s", err)
-					if err := connection.WriteMessage(websocket.TextMessage, []byte("bye!")); err != nil {
-						clog.Warn("failed to send termination message from tty to xterm.js: %s", err)
+				default:
+					if errorCounter > connectionErrorLimit {
+						msg := fmt.Sprintf("error in %s: connection error limit reached, closing connection...", goRoutineName)
+						clog.Warn(msg)
+						errChan <- errors.New(msg)
+						break
 					}
-					waiter.Done()
-					return
-				}
-				if err := connection.WriteMessage(websocket.BinaryMessage, buffer[:readLength]); err != nil {
-					clog.Warn("failed to send %v bytes from tty to xterm.js", readLength)
-					errorCounter++
-					continue
-				}
-				clog.Debug("sent message of size %v bytes from tty to xterm.js", readLength)
-				errorCounter = 0
-			}
-		}()
-
-		// tty << xterm.js
-		go func() {
-			for {
-				if connectionClosed {
-					clog.Info("connection is closed, exiting from tty << xterm.js...")
-					return
-				}
-				// data processing
-				messageType, data, err := connection.ReadMessage()
-				if err != nil {
-					if !connectionClosed {
-						clog.Warn("failed to get next reader: %s", err)
+					buffer := make([]byte, maxBufferSizeBytes)
+					readLength, err := tty.Read(buffer)
+					if err != nil {
+						msg := fmt.Sprintf("error in %s: failed to read from tty: %s", goRoutineName, err)
+						clog.Warn(msg)
+						if err := connection.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("📣 server is closing conection,'%s' bye!", infoCloseReason))); err != nil {
+							clog.Warn("%s : failed to send termination message from tty to xterm.js: %s", goRoutineName, err)
+						}
+						errChan <- errors.New(msg)
+						return
 					}
-					return
-				}
-				dataLength := len(data)
-				dataBuffer := bytes.Trim(data, "\x00")
-				dataType, ok := WebsocketMessageType[messageType]
-				if !ok {
-					dataType = "unknown"
-				}
-				clog.Info("received %s (type: %v) message of size %v byte(s) from xterm.js with key sequence: %v", dataType, messageType, dataLength, dataBuffer)
-
-				// process
-				if dataLength == -1 { // invalid
-					clog.Warn("failed to get the correct number of bytes read, ignoring message")
-					continue
-				}
-
-				// handle resizing
-				if messageType == websocket.BinaryMessage {
-					if dataBuffer[0] == 1 {
-						ttySize := &TTYSize{}
-						resizeMessage := bytes.Trim(dataBuffer[1:], " \n\r\t\x00\x01")
-						if err := json.Unmarshal(resizeMessage, ttySize); err != nil {
-							clog.Warn("failed to unmarshal received resize message '%s': %s", string(resizeMessage), err)
-							continue
-						}
-						clog.Info("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols)
-						if err := pty.Setsize(tty, &pty.Winsize{
-							Rows: ttySize.Rows,
-							Cols: ttySize.Cols,
-						}); err != nil {
-							clog.Warn("failed to resize tty, error: %s", err)
-						}
+					if err := connection.WriteMessage(websocket.BinaryMessage, buffer[:readLength]); err != nil {
+						clog.Warn("%s :failed to send %v bytes from tty to xterm.js", goRoutineName, readLength)
+						errorCounter++
 						continue
 					}
+					clog.Debug("%s :sent message of size %v bytes from tty to xterm.js", goRoutineName, readLength)
+					errorCounter = 0
 				}
-
-				// write to tty
-				bytesWritten, err := tty.Write(dataBuffer)
-				if err != nil {
-					clog.Warn(fmt.Sprintf("failed to write %v bytes to tty: %s", len(dataBuffer), err))
-					continue
-				}
-				clog.Debug("%v bytes written to tty...", bytesWritten)
 			}
-		}()
+		}(errChan, done)
 
-		waiter.Wait()
+		// tty << xterm.js
+		go func(errChan chan<- error, done <-chan struct{}) {
+			goRoutineName := "ReadingFromXTerm"
+			defer clog.Info(fmt.Sprintf("%s : exiting...", goRoutineName))
+			for {
+				select {
+				case <-done:
+					clog.Info(fmt.Sprintf("%s : connection is closed, exiting from tty << xterm.js...", goRoutineName))
+					return
+				default:
+					// data processing
+					messageType, data, err := connection.ReadMessage()
+					if err != nil {
+						msg := fmt.Sprintf("error in %s, failed to get next reader. err: %s", goRoutineName, err)
+						clog.Warn(msg)
+						errChan <- errors.New(msg)
+						return
+					}
+					dataLength := len(data)
+					dataBuffer := bytes.Trim(data, "\x00")
+					dataType, ok := WebsocketMessageType[messageType]
+					if !ok {
+						dataType = "unknown"
+					}
+					clog.Info("%s received %s (type: %v) message of size %v byte(s) from xterm.js with key sequence: %v", goRoutineName, dataType, messageType, dataLength, dataBuffer)
+
+					// process
+					if dataLength == -1 { // invalid
+						clog.Warn("failed to get the correct number of bytes read, ignoring message")
+						continue
+					}
+
+					// handle resizing
+					if messageType == websocket.BinaryMessage {
+						if dataBuffer[0] == 1 {
+							ttySize := &TTYSize{}
+							resizeMessage := bytes.Trim(dataBuffer[1:], " \n\r\t\x00\x01")
+							if err := json.Unmarshal(resizeMessage, ttySize); err != nil {
+								clog.Warn("failed to unmarshal received resize message '%s': %s", string(resizeMessage), err)
+								continue
+							}
+							clog.Info("resizing tty to use %v rows and %v columns...", ttySize.Rows, ttySize.Cols)
+							if err := pty.Setsize(tty, &pty.Winsize{
+								Rows: ttySize.Rows,
+								Cols: ttySize.Cols,
+							}); err != nil {
+								clog.Warn("failed to resize tty, error: %s", err)
+							}
+							continue
+						}
+					}
+
+					// write to tty
+					bytesWritten, err := tty.Write(dataBuffer)
+					if err != nil {
+						clog.Warn(fmt.Sprintf("failed to write %v bytes to tty: %s", len(dataBuffer), err))
+						errChan <- fmt.Errorf("error in %s: failed to write to tty", goRoutineName)
+						continue
+					}
+					clog.Debug("%v bytes written to tty...", bytesWritten)
+				}
+			}
+		}(errChan, done)
+
+		select {
+		case err = <-errChan:
+			clog.Warn(fmt.Sprintf("Error occurred in one of goroutines : '%v'", err))
+			// Signal to all goroutines to exit
+			close(done)
+		}
 		clog.Info("closing connection...")
-		connectionClosed = true
+		// Wait for all goroutines to finish
+		time.Sleep(time.Second)
+		clog.Info("%s :all goroutines should have exited by now", handlerName)
 	}
 }
