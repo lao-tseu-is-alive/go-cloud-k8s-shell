@@ -34,6 +34,7 @@ type HandlerOpts struct {
 	// cycle should be tolerated, beyond this the connection should be deemed dead
 	KeepalivePingTimeout time.Duration
 	MaxBufferSizeBytes   int
+	JwtCheck             gohttp.JwtChecker
 }
 
 func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
@@ -79,6 +80,19 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 			return
 		}
 		clog.Info("pty.Start done....")
+		token := r.URL.Query().Get("token")
+		clog.Info("received token: '%s'", token)
+		claims, err := opts.JwtCheck.ParseToken(token)
+		if err != nil {
+			clog.Warn("failed to parse token: %s", err)
+			err := connection.WriteMessage(websocket.TextMessage, []byte("failed to parse JWT token"))
+			if err != nil {
+				clog.Warn("failed to send error message to xterm.js: %s", err)
+				return
+			}
+			return
+		}
+		clog.Info("OK parsed JWT token: %+v", claims)
 		defer func() {
 			clog.Info("gracefully stopping spawned tty...")
 			if err := cmd.Process.Kill(); err != nil {
@@ -107,6 +121,10 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		})
 		go func() {
 			for {
+				if connectionClosed {
+					clog.Info("connection is closed, exiting from tty >> xterm.js...")
+					return
+				}
 				if err := connection.WriteMessage(websocket.PingMessage, []byte("keepalive")); err != nil {
 					clog.Warn("failed to write ping message")
 					return
@@ -118,6 +136,13 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 					return
 				}
 				clog.Debug("received response from ping successfully")
+				if !claims.IsValidAt(time.Now()) {
+					clog.Warn("token has expired, triggering disconnect now...")
+					waiter.Done()
+					return
+				} else {
+					clog.Debug("token is still valid at %v, until %v", time.Now(), claims.ExpiresAt)
+				}
 			}
 		}()
 
@@ -125,9 +150,10 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		go func() {
 			errorCounter := 0
 			for {
-				// consider the connection closed/errored out so that the socket handler
-				// can be terminated - this frees up memory so the service doesn't get
-				// overloaded
+				if connectionClosed {
+					clog.Info("connection is closed, exiting from tty >> xterm.js...")
+					return
+				}
 				if errorCounter > connectionErrorLimit {
 					waiter.Done()
 					break
@@ -155,6 +181,10 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		// tty << xterm.js
 		go func() {
 			for {
+				if connectionClosed {
+					clog.Info("connection is closed, exiting from tty << xterm.js...")
+					return
+				}
 				// data processing
 				messageType, data, err := connection.ReadMessage()
 				if err != nil {

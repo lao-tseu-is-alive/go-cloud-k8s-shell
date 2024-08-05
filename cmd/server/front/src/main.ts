@@ -56,7 +56,7 @@ loginForm.addEventListener('submit', async (e) => {
     const data = new FormData(loginForm);
     console.log("data", data);
     //const url = loginForm.action;
-    const url = "http://localhost:9999/login"
+    const url = "http://localhost:9999/api/login"
     const response = await fetch(url, {
       method: 'post',
       body: data

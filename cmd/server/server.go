@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"fmt"
+	"github.com/jub0bs/cors"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/config"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttp"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
@@ -77,9 +78,21 @@ func main() {
 	allowedHosts := config.GetAllowedIpsFromEnvOrPanic(defaultAllowedHosts)
 	mux := server.GetRouter()
 	myJwt := server.JwtCheck
-	mux.Handle("POST /login", gohttp.GetLoginPostHandler(server))
 
-	mux.Handle("GET /goshell", myJwt.JwtMiddleware(shell.GetShellHandler(shell.HandlerOpts{
+	// create CORS middleware
+	corsMw, err := cors.NewMiddleware(cors.Config{
+		Origins:        []string{"http://localhost:5173"},
+		Methods:        []string{http.MethodGet, http.MethodPost},
+		RequestHeaders: []string{"Authorization"},
+	})
+	if err != nil {
+		log.Fatalf("💥💥 error cors.NewMiddleware error: %v'\n", err)
+	}
+	corsMw.SetDebug(true) // turn debug mode on (optional)
+	api := http.NewServeMux()
+	api.Handle("POST /login", gohttp.GetLoginPostHandler(server))
+	//myJwt.JwtMiddleware(
+	mux.Handle("GET /goshell", shell.GetShellHandler(shell.HandlerOpts{
 		AllowedHostnames:     allowedHosts,
 		Arguments:            args,
 		Command:              command,
@@ -87,7 +100,9 @@ func main() {
 		Logger:               l,
 		KeepalivePingTimeout: time.Second * 200,
 		MaxBufferSizeBytes:   512,
-	})))
+		JwtCheck:             myJwt,
+	}))
+	mux.Handle("/api/", http.StripPrefix("/api", corsMw.Wrap(api))) // note: method-less pattern here
 	mux.Handle("GET /*", gohttp.NewPrometheusMiddleware(
 		server.GetPrometheusRegistry(), nil).
 		WrapHandler("GET /*", GetMyDefaultHandler(server, defaultWebRootDir, content)),
