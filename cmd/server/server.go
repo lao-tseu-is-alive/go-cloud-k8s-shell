@@ -27,7 +27,7 @@ const (
 )
 
 var (
-	defaultAllowedHosts = []string{"127.0.0.1"}
+	defaultAllowedHosts = []string{"localhost"}
 	command             = "/bin/bash"
 	args                []string
 )
@@ -79,13 +79,13 @@ func main() {
 		myVersionReader,
 		l)
 
-	allowedHosts := config.GetAllowedIpsFromEnvOrPanic(defaultAllowedHosts)
+	allowedHosts := config.GetAllowedHostsFromEnvOrPanic()
 	mux := server.GetRouter()
 	myJwt := server.JwtCheck
 
 	// create CORS middleware
 	corsMw, err := cors.NewMiddleware(cors.Config{
-		Origins:        []string{"http://localhost:5173"},
+		Origins:        []string{"http://localhost:5173"}, // for vite js dev server
 		Methods:        []string{http.MethodGet, http.MethodPost},
 		RequestHeaders: []string{"Authorization"},
 	})

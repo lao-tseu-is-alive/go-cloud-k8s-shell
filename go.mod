@@ -6,7 +6,7 @@ require (
 	github.com/creack/pty v1.1.21
 	github.com/gorilla/websocket v1.5.3
 	github.com/jub0bs/cors v0.2.0
-	github.com/lao-tseu-is-alive/go-cloud-k8s-common v0.3.6
+	github.com/lao-tseu-is-alive/go-cloud-k8s-common v0.3.7
 	github.com/stretchr/testify v1.9.0
 )
 
