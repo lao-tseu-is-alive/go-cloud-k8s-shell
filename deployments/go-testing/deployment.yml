@@ -187,7 +187,7 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.1.26
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.3.2
         imagePullPolicy: Always
         securityContext:
           seccompProfile:
@@ -233,6 +233,42 @@ spec:
         env:
           - name: PORT
             value: "9999"
+          - name: ADMIN_USER
+            valueFrom:
+              configMapKeyRef:
+                key: ADMIN_USER
+                name: app-configs
+          - name: ADMIN_PASSWORD
+            valueFrom:
+              configMapKeyRef:
+                key: ADMIN_PASSWORD
+                name: app-configs
+          - name: ADMIN_EMAIL
+            valueFrom:
+              configMapKeyRef:
+                key: ADMIN_EMAIL
+                name: app-configs
+          - name: ADMIN_ID
+            valueFrom:
+              configMapKeyRef:
+                key: ADMIN_ID
+                name: app-configs
+          - name: JWT_SECRET
+            valueFrom:
+              configMapKeyRef:
+                key: JWT_SECRET
+                name: app-configs
+          - name: JWT_ISSUER_ID
+            valueFrom:
+              configMapKeyRef:
+                key: JWT_ISSUER_ID
+                name: app-configs
+
+          - name: JWT_DURATION_MINUTES
+            valueFrom:
+              configMapKeyRef:
+                key: JWT_DURATION_MINUTES
+                name: app-configs
           - name: MY_NODE_NAME
             valueFrom:
               fieldRef:

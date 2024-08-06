@@ -11,6 +11,7 @@ import (
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"time"
 )
@@ -47,7 +48,9 @@ func GetMyDefaultHandler(s *gohttp.Server, webRootDir string, content embed.FS) 
 	if err != nil {
 		logger.Fatal("Error creating sub-filesystem: %v", err)
 	}
-
+	mime.AddExtensionType(".js", "application/javascript")
+	mime.AddExtensionType(".css", "text/css")
+	mime.AddExtensionType(".svg", "image/svg+xml")
 	// Create a file server handler for the embed filesystem
 	handler := http.FileServer(http.FS(subFS))
 

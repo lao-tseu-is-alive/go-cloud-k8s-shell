@@ -27,3 +27,4 @@ go_admin_credentials_secrets
 /cmd/server/go-cloud-k8s-shell-front/
 /.env
 /.env_for_github.txt
+/deployments/go-testing/configmap.yaml
