@@ -68,8 +68,8 @@ loginForm.addEventListener("submit", async (e) => {
   if (inputHashedPassword.value.length > 0 && inputPassword.value.length > 0) {
     const data = new FormData(loginForm);
     console.log("data", data);
-    //const url = loginForm.action;
-    const url = `http://${serverHost}/api/login`;
+    const serverProtocol= window.location.protocol
+    const url = `${serverProtocol}//${serverHost}/api/login`;
     const response = await fetch(url, {
       method: "post",
       body: data,
