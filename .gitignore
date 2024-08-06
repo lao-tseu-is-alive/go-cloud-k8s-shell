@@ -28,3 +28,5 @@ go_admin_credentials_secrets
 /.env
 /.env_for_github.txt
 /deployments/go-testing/configmap.yaml
+/deployments/go-testing/configmap-soi.yaml
+/go-shell-server

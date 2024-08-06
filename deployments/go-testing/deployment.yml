@@ -187,7 +187,7 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.3.3
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.3.4
         imagePullPolicy: Always
         securityContext:
           seccompProfile:
