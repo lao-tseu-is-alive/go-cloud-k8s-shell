@@ -20,7 +20,6 @@ RUN go mod download
 # Copy the source from the current directory to the Working Directory inside the container
 COPY cmd/server ./server
 COPY cmd/server/front/dist ./server/front/dist
-COPY cmd/server/front/dist/assets ./server/front/dist/assets
 COPY pkg ./pkg
 
 

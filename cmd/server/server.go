@@ -58,9 +58,6 @@ func GetMyDefaultHandler(s *gohttp.Server, webRootDir string, content embed.FS) 
 	return func(w http.ResponseWriter, r *http.Request) {
 		gohttp.TraceRequest(handlerName, r, logger)
 		RootPathGetCounter.Inc()
-		// Debugging headers
-		logger.Debug("Serving %s with Content-Type: %s", r.URL.Path, w.Header().Get("Content-Type"))
-
 		handler.ServeHTTP(w, r)
 	}
 }
