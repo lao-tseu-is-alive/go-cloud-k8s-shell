@@ -48,6 +48,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_ID: ${{ secrets.ADMIN_ID }}
+          ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
         run: go test -race -covermode=atomic -coverprofile=coverage.out -v ./...
 
       - name: Upload coverage to Codecov
