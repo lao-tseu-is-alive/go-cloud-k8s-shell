@@ -52,11 +52,15 @@ func GetMyDefaultHandler(s *gohttp.Server, webRootDir string, content embed.FS) 
 	mime.AddExtensionType(".css", "text/css")
 	mime.AddExtensionType(".svg", "image/svg+xml")
 	// Create a file server handler for the embed filesystem
-	handler := http.FileServer(http.FS(subFS))
+	// handler := http.FileServer(http.FS(subFS))
+	handler := http.FileServerFS(subFS)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		gohttp.TraceRequest(handlerName, r, logger)
 		RootPathGetCounter.Inc()
+		// Debugging headers
+		logger.Debug("Serving %s with Content-Type: %s", r.URL.Path, w.Header().Get("Content-Type"))
+
 		handler.ServeHTTP(w, r)
 	}
 }
