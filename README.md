@@ -30,6 +30,7 @@ this script gives an example of service discovery using the kubernetes api
 
 ### More info :
 
++ [Nerdctl is a Docker-compatible CLI for containerd, with support for Compose](https://github.com/containerd/nerdctl)
 + [Checkov is a static code analysis tool for scanning infrastructure as code (IaC)](https://www.checkov.io/1.Welcome/What%20is%20Checkov.html)
 + [Kube-bench](https://github.com/aquasecurity/kube-bench/blob/main/docs/installation.md)
 + [Falco runtime security for hosts, containers, Kubernetes and the cloud.](https://falco.org/)
