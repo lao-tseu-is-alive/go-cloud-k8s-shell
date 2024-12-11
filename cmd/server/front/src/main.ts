@@ -1,7 +1,6 @@
 import "./skeleton.css";
 import "@xterm/xterm/css/xterm.css";
-import sha256 from "crypto-js/sha256";
-import { APP, VERSION, BUILD_DATE, REPOSITORY } from "./version.ts";
+import { APP, BUILD_DATE, REPOSITORY, VERSION } from "./version.ts";
 import { setupTerminal } from "./terminal.ts";
 
 const html = `
@@ -52,13 +51,21 @@ const serverHost =
   window.location.port === "5173" ? "localhost:9999" : window.location.host;
 appInfo.innerHTML = `<a href="${REPOSITORY}">${APP}</a> v${VERSION} - ${BUILD_DATE}`;
 
+async function hashPasswordSha256(password:string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   console.log("in loginForm submit event :", e);
   const inputPassword: HTMLInputElement = document.getElementById(
     "password",
   )! as HTMLInputElement;
-  const hashedPassword = sha256(inputPassword.value);
+  const hashedPassword = await hashPasswordSha256(`${inputPassword.value}`);
   const inputHashedPassword: HTMLInputElement = document.getElementById(
     "hashed",
   )! as HTMLInputElement;
@@ -68,7 +75,7 @@ loginForm.addEventListener("submit", async (e) => {
   if (inputHashedPassword.value.length > 0 && inputPassword.value.length > 0) {
     const data = new FormData(loginForm);
     console.log("data", data);
-    const serverProtocol= window.location.protocol
+    const serverProtocol = window.location.protocol;
     const url = `${serverProtocol}//${serverHost}/api/login`;
     const response = await fetch(url, {
       method: "post",
