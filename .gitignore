@@ -30,3 +30,4 @@ go_admin_credentials_secrets
 /deployments/go-testing/configmap.yaml
 /deployments/go-testing/configmap-soi.yaml
 /go-shell-server
+/coverage.out
