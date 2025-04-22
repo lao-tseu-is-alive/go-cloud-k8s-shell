@@ -19,7 +19,6 @@ import (
 const (
 	defaultPort       = 9999
 	defaultServerIp   = "0.0.0.0"
-	defaultServerPath = "/"
 	defaultWebRootDir = "front/dist"
 	defaultAdminId    = 99999
 	defaultAdminUser  = "goadmin"
@@ -62,7 +61,7 @@ func GetMyDefaultHandler(s *gohttp.Server, webRootDir string, content embed.FS) 
 }
 
 func main() {
-	l, err := golog.NewLogger("zap", golog.DebugLevel, fmt.Sprintf("%s ", version.APP))
+	l, err := golog.NewLogger("simple", golog.DebugLevel, fmt.Sprintf("%s ", version.APP))
 	if err != nil {
 		log.Fatalf("💥💥 error log.NewLogger error: %v'\n", err)
 	}
