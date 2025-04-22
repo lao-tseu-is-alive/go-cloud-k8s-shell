@@ -1,12 +1,15 @@
 # Start from the latest golang base image
-FROM golang:1-alpine3.20 AS builder
-ENV PATH /usr/local/go/bin:$PATH
-ENV GOLANG_VERSION 1.22.5
+FROM golang:1.24.2-alpine3.21 AS builder
 
+# Add Maintainer Info
 LABEL maintainer="cgil"
-
-#RUN addgroup -S gouser && adduser -S gouser -G gouser
-#USER gouser
+LABEL org.opencontainers.image.title="go-cloud-k8s-shell"
+LABEL org.opencontainers.image.description="This is a go-cloud-k8s-shell container image, a simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster"
+LABEL org.opencontainers.image.url="https://ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:latest"
+LABEL org.opencontainers.image.authors="cgil"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.source="https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell"
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -18,13 +21,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the source from the current directory to the Working Directory inside the container
-COPY cmd/server ./server
-COPY cmd/server/front/dist ./server/front/dist
+COPY "cmd/server" ./server
 COPY pkg ./pkg
 
 
 # Build the Go app
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o go-shell-server ./server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags="-w -s" -o go-shell-server ./server
 
 
 ######## Start a new stage  #######
@@ -39,6 +41,8 @@ LABEL org.opencontainers.image.authors="cgil"
 LABEL description="This is a go-cloud-k8s-shell container image, a simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster "
 LABEL org.opencontainers.image.description="This is a go-cloud-k8s-shell container image, a simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster "
 LABEL org.opencontainers.image.url="ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:latest"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.source="https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell"
 
 RUN apt-get update && apt-get install -y iproute2 file checksec nmap postgresql-client curl jq iputils-ping dnsutils tcpdump iftop netcat-openbsd wget && apt-get -y upgrade && apt-get clean
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser

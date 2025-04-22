@@ -20,7 +20,7 @@ const (
 	defaultPort       = 9999
 	defaultServerIp   = "0.0.0.0"
 	defaultServerPath = "/"
-	defaultWebRootDir = "front/dist/"
+	defaultWebRootDir = "front/dist"
 	defaultAdminId    = 99999
 	defaultAdminUser  = "goadmin"
 	defaultAdminEmail = "goadmin@lausanne.ch"
@@ -44,7 +44,7 @@ func GetMyDefaultHandler(s *gohttp.Server, webRootDir string, content embed.FS) 
 	RootPathGetCounter := s.RootPathGetCounter
 
 	// Create a subfolder filesystem to serve only the content of front/dist
-	subFS, err := fs.Sub(content, "front/dist")
+	subFS, err := fs.Sub(content, webRootDir)
 	if err != nil {
 		logger.Fatal("Error creating sub-filesystem: %v", err)
 	}
@@ -52,8 +52,7 @@ func GetMyDefaultHandler(s *gohttp.Server, webRootDir string, content embed.FS) 
 	mime.AddExtensionType(".css", "text/css")
 	mime.AddExtensionType(".svg", "image/svg+xml")
 	// Create a file server handler for the embed filesystem
-	// handler := http.FileServer(http.FS(subFS))
-	handler := http.FileServerFS(subFS)
+	handler := http.FileServer(http.FS(subFS))
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		gohttp.TraceRequest(handlerName, r, logger)
@@ -69,19 +68,31 @@ func main() {
 	}
 	l.Info("🚀🚀 Starting %s v:%s from %s", version.APP, version.VERSION, version.REPOSITORY)
 
-	myVersionReader := gohttp.NewSimpleVersionReader(version.APP, version.VERSION, version.REVISION)
+	myVersionReader := gohttp.NewSimpleVersionReader(version.APP, version.VERSION, version.REVISION, version.Build)
+	// Create a new JWT checker
+	myJwt := gohttp.NewJwtChecker(
+		config.GetJwtSecretFromEnvOrPanic(),
+		config.GetJwtIssuerFromEnvOrPanic(),
+		version.APP,
+		config.GetJwtDurationFromEnvOrPanic(60),
+		l)
+	// Create a new Authenticator with a simple admin user
+	myAuthenticator := gohttp.NewSimpleAdminAuthenticator(
+		config.GetAdminUserFromFromEnvOrPanic(defaultAdminUser),
+		config.GetAdminPasswordFromFromEnvOrPanic(),
+		config.GetAdminEmailFromFromEnvOrPanic(defaultAdminEmail),
+		config.GetAdminIdFromFromEnvOrPanic(defaultAdminId),
+		myJwt)
 	server := gohttp.CreateNewServerFromEnvOrFail(
 		defaultPort,
 		defaultServerIp,
-		defaultAdminUser,
-		defaultAdminEmail,
-		defaultAdminId,
+		myAuthenticator,
+		myJwt,
 		myVersionReader,
 		l)
 
 	allowedHosts := config.GetAllowedHostsFromEnvOrPanic()
 	mux := server.GetRouter()
-	myJwt := server.JwtCheck
 
 	// create CORS middleware
 	corsMw, err := cors.NewMiddleware(cors.Config{
@@ -93,9 +104,7 @@ func main() {
 		log.Fatalf("💥💥 error cors.NewMiddleware error: %v'\n", err)
 	}
 	corsMw.SetDebug(true) // turn debug mode on (optional)
-	api := http.NewServeMux()
-	api.Handle("POST /login", gohttp.GetLoginPostHandler(server))
-	//myJwt.JwtMiddleware(
+	mux.Handle("POST /login", corsMw.Wrap(gohttp.GetLoginPostHandler(server)))
 	mux.Handle("GET /goshell", shell.GetShellHandler(shell.HandlerOpts{
 		AllowedHostnames:     allowedHosts,
 		Arguments:            args,
@@ -106,10 +115,10 @@ func main() {
 		MaxBufferSizeBytes:   512,
 		JwtCheck:             myJwt,
 	}))
-	mux.Handle("/api/", http.StripPrefix("/api", corsMw.Wrap(api))) // note: method-less pattern here
-	mux.Handle("GET /*", gohttp.NewPrometheusMiddleware(
+	mux.Handle("GET /api", http.StripPrefix("/api", corsMw.Wrap(mux))) // note: method-less pattern here
+	mux.Handle("GET /", gohttp.NewPrometheusMiddleware(
 		server.GetPrometheusRegistry(), nil).
-		WrapHandler("GET /*", GetMyDefaultHandler(server, defaultWebRootDir, content)),
+		WrapHandler("GET /", GetMyDefaultHandler(server, defaultWebRootDir, content)),
 	)
 	server.StartServer()
 }

@@ -1,5 +1,6 @@
 import "./skeleton.css";
 import "@xterm/xterm/css/xterm.css";
+import "./style.css";
 import { APP, BUILD_DATE, REPOSITORY, VERSION } from "./version.ts";
 import { setupTerminal } from "./terminal.ts";
 
@@ -31,7 +32,7 @@ const html = `
   <div class="row">
   <div class="row">
     <div class="twelve columns">
-      <div id="terminal"></div>
+      <div id="terminal" class="my-terminal"></div>
     </div>    
   </div>  
 </div>
@@ -76,7 +77,7 @@ loginForm.addEventListener("submit", async (e) => {
     const data = new FormData(loginForm);
     console.log("data", data);
     const serverProtocol = window.location.protocol;
-    const url = `${serverProtocol}//${serverHost}/api/login`;
+    const url = `${serverProtocol}//${serverHost}/login`;
     const response = await fetch(url, {
       method: "post",
       body: data,
