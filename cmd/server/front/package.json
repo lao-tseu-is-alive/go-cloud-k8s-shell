@@ -11,7 +11,7 @@
   "devDependencies": {
     "prettier": "^3.3.3",
     "typescript": "^5.2.2",
-    "vite": "6.3.2"
+    "vite": "6.3.4"
   },
   "dependencies": {
     "@xterm/addon-attach": "^0.11.0",
