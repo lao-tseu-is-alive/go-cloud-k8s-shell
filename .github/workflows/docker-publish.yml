@@ -11,10 +11,8 @@ env:
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
 
-
 jobs:
   build:
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,12 +24,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-      - name: Test
+        with:
+          fetch-depth: 0 # Ensure full Git history for git describe
+
+      - name: Set environment variables
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+          echo "APP_REVISION=$(git describe --dirty --always)" >> $GITHUB_ENV
+          echo "BUILD=$(date -u '+%Y-%m-%d_%I:%M:%S%p')" >> $GITHUB_ENV
+          echo "APP_REPOSITORY=https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell" >> $GITHUB_ENV
+
+      - name: Test environment variables
         run: |
           echo $RELEASE_VERSION
-          echo ${{ env.RELEASE_VERSION }}      
+          echo ${{ env.RELEASE_VERSION }}
+          echo $APP_REVISION
+          echo $BUILD
+          echo $APP_REPOSITORY
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -88,3 +97,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_REVISION=${{ env.APP_REVISION }}
+            BUILD=${{ env.BUILD }}
+            APP_REPOSITORY=${{ env.APP_REPOSITORY }}

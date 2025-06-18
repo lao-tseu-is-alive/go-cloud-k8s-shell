@@ -67,7 +67,7 @@ func main() {
 	}
 	l.Info("🚀🚀 Starting %s v:%s from %s", version.APP, version.VERSION, version.REPOSITORY)
 
-	myVersionReader := gohttp.NewSimpleVersionReader(version.APP, version.VERSION, version.REVISION, version.Build)
+	myVersionReader := gohttp.NewSimpleVersionReader(version.APP, version.VERSION, version.REVISION, version.BuildStamp)
 	// Create a new JWT checker
 	myJwt := gohttp.NewJwtChecker(
 		config.GetJwtSecretFromEnvOrPanic(),

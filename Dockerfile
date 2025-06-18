@@ -1,6 +1,11 @@
 # Start from the latest golang base image
 FROM golang:1.24.4-alpine3.22 AS builder
 
+# Define build arguments for version and build timestamp
+ARG APP_REVISION
+ARG BUILD
+ARG APP_REPOSITORY=https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell
+
 # Add Maintainer Info
 LABEL maintainer="cgil"
 LABEL org.opencontainers.image.title="go-cloud-k8s-shell"
@@ -9,7 +14,8 @@ LABEL org.opencontainers.image.url="https://ghcr.io/lao-tseu-is-alive/go-cloud-k
 LABEL org.opencontainers.image.authors="cgil"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="1.0.0"
-LABEL org.opencontainers.image.source="https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell"
+# Set image version label dynamically
+LABEL org.opencontainers.image.source="${APP_REPOSITORY}"
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -24,9 +30,9 @@ RUN go mod download
 COPY "cmd/server" ./server
 COPY pkg ./pkg
 
-
-# Build the Go app
-RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags="-w -s" -o go-shell-server ./server
+# Clean the APP_REPOSITORY for ldflags
+RUN APP_REPOSITORY_CLEAN=$(echo $APP_REPOSITORY | sed 's|https://||') && \
+    CGO_ENABLED=0 GOOS=linux go build -a -ldflags="-w -s -X ${APP_REPOSITORY_CLEAN}/pkg/version.REVISION=${APP_REVISION} -X ${APP_REPOSITORY_CLEAN}/pkg/version.BuildStamp=${BUILD}" -o go-shell-server ./server
 
 
 ######## Start a new stage  #######
@@ -41,8 +47,14 @@ LABEL org.opencontainers.image.authors="cgil"
 LABEL description="This is a go-cloud-k8s-shell container image, a simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster "
 LABEL org.opencontainers.image.description="This is a go-cloud-k8s-shell container image, a simple Golang microservice with some essential command line tools to make some tests inside a k8s cluster "
 LABEL org.opencontainers.image.url="ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:latest"
-LABEL org.opencontainers.image.version="1.0.0"
 LABEL org.opencontainers.image.source="https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell"
+
+# Pass build arguments to the final stage for labeling
+ARG APP_REVISION
+ARG BUILD
+LABEL org.opencontainers.image.version="${APP_REVISION}"
+LABEL org.opencontainers.image.revision="${APP_REVISION}"
+LABEL org.opencontainers.image.created="${BUILD}"
 
 RUN apt-get update && apt-get install -y iproute2 file checksec nmap postgresql-client curl jq iputils-ping dnsutils tcpdump iftop netcat-openbsd wget && apt-get -y upgrade && apt-get clean
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser

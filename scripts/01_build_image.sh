@@ -47,7 +47,9 @@ then
       cd "$OLDPWD" || exit
       rm -rf "$TMP_Docker_Dir" # cleanup
       echo "will parse the multi-stage Dockerfile in the current directory and build the final image"
-      if ${DOCKER_BIN} build -t ${CONTAINER_REGISTRY_ID}/"${APP_NAME}" . ;
+      APP_REVISION=$(git describe --dirty --always)
+      BUILD_TIMESTAMP=$(date -u '+%Y-%m-%d_%I:%M:%S%p')
+      if ${DOCKER_BIN} build --build-arg APP_REVISION=$APP_REVISION --build-arg BUILD=$BUILD_TIMESTAMP -t ${CONTAINER_REGISTRY_ID}/"${APP_NAME}" . ;
       then
         echo "will tag this image with version ${APP_VERSION}"
         ${DOCKER_BIN} tag ${CONTAINER_REGISTRY_ID}/"${APP_NAME}" ${CONTAINER_REGISTRY_ID}/"${APP_NAME}":"${APP_VERSION}"
