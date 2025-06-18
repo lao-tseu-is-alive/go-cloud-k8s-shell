@@ -1,5 +1,5 @@
 # Start from the latest golang base image
-FROM golang:1.24.2-alpine3.21 AS builder
+FROM golang:1.24.4-alpine3.22 AS builder
 
 # Add Maintainer Info
 LABEL maintainer="cgil"
@@ -49,7 +49,7 @@ RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group
 RUN groupadd pcap && usermod -a -G pcap gouser && chmod a+x /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip  /usr/sbin/iftop
 WORKDIR /tmp
 #RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-RUN curl -LO "https://dl.k8s.io/release/v1.32.3/bin/linux/amd64/kubectl"
+RUN curl -LO "https://dl.k8s.io/release/v1.33.1/bin/linux/amd64/kubectl"
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 WORKDIR /home/gouser
 
