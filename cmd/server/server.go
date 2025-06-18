@@ -91,6 +91,7 @@ func main() {
 		l)
 
 	allowedHosts := config.GetAllowedHostsFromEnvOrPanic()
+	server.AddRoute("GET /info", gohttp.GetInfoHandler(server))
 	mux := server.GetRouter()
 
 	// create CORS middleware
