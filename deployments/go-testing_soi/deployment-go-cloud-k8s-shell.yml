@@ -187,7 +187,7 @@ spec:
           - 100
       containers:
       - name: go-cloud-k8s-shell
-        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.3.18
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.3.19
         imagePullPolicy: Always
         securityContext:
           seccompProfile:
@@ -227,6 +227,8 @@ spec:
           initialDelaySeconds: 5
           timeoutSeconds: 2
         env:
+          - name: TERM
+            value: "xterm-256color"
           - name: PORT
             value: "9999"
           - name: ADMIN_USER
