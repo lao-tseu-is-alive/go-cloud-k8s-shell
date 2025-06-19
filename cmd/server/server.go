@@ -65,14 +65,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("💥💥 error log.NewLogger error: %v'\n", err)
 	}
-	l.Info("🚀🚀 Starting %s v:%s from %s", version.APP, version.VERSION, version.REPOSITORY)
-
-	myVersionReader := gohttp.NewSimpleVersionReader(version.APP, version.VERSION, version.REVISION, version.BuildStamp)
+	l.Info("🚀🚀 Starting %s v:%s, build:%s from %s", version.APP, version.VERSION, version.BuildStamp, version.REPOSITORY)
+	// Get the ENV JWT_AUTH_URL value
+	jwtAuthUrl := config.GetJwtAuthUrlFromEnvOrPanic()
+	jwtContextKey := config.GetJwtContextKeyFromEnvOrPanic()
+	myVersionReader := gohttp.NewSimpleVersionReader(version.APP, version.VERSION, version.REPOSITORY, version.REVISION, version.BuildStamp, jwtAuthUrl)
 	// Create a new JWT checker
 	myJwt := gohttp.NewJwtChecker(
 		config.GetJwtSecretFromEnvOrPanic(),
 		config.GetJwtIssuerFromEnvOrPanic(),
 		version.APP,
+		jwtContextKey,
 		config.GetJwtDurationFromEnvOrPanic(60),
 		l)
 	// Create a new Authenticator with a simple admin user
@@ -92,6 +95,7 @@ func main() {
 
 	allowedHosts := config.GetAllowedHostsFromEnvOrPanic()
 	server.AddRoute("GET /info", gohttp.GetInfoHandler(server))
+
 	mux := server.GetRouter()
 
 	// create CORS middleware
@@ -104,7 +108,10 @@ func main() {
 		log.Fatalf("💥💥 error cors.NewMiddleware error: %v'\n", err)
 	}
 	corsMw.SetDebug(true) // turn debug mode on (optional)
-	mux.Handle("POST /login", corsMw.Wrap(gohttp.GetLoginPostHandler(server)))
+
+	mux.Handle("GET /goAppInfo", corsMw.Wrap(gohttp.GetAppInfoHandler(server)))
+
+	mux.Handle(fmt.Sprintf("POST %s", jwtAuthUrl), corsMw.Wrap(gohttp.GetLoginPostHandler(server)))
 	mux.Handle("GET /goshell", shell.GetShellHandler(shell.HandlerOpts{
 		AllowedHostnames:     allowedHosts,
 		Arguments:            args,
