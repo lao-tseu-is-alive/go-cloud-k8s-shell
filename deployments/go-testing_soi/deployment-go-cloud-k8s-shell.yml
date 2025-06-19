@@ -1,0 +1,304 @@
+---
+### go-cloud-k8s-shell     : the name of the container image
+### v0.1.26  : the version of the app image to deploy
+### ghcr.io/lao-tseu-is-alive  : the prefix to your images in your container registry
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: go-testing
+  labels:
+    env: test
+    app: goeland
+    # https://kubernetes.io/docs/concepts/security/pod-security-admission/
+    # The per-mode level label indicates which policy level to apply for the mode.
+    # MODE must be one of `enforce`, `audit`, or `warn`.
+    # LEVEL must be one of `privileged`, `baseline`, or `restricted`.
+    # pod-security.kubernetes.io/<MODE>: <LEVEL>
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-resources
+  namespace: go-testing
+  labels:
+    app: go-cloud-k8s-shell
+spec:
+### ADAPT the values above to your need remember that you m
+  hard:
+    requests.cpu: "8"
+    requests.memory: 8Gi
+    limits.cpu: "16"
+    limits.memory: 16Gi
+---
+## https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/memory-default-namespace/
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: mem-limit-range
+spec:
+  limits:
+    - default:
+        memory: 512Mi
+      defaultRequest:
+        memory: 256Mi
+      type: Container
+---
+## https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/cpu-default-namespace/
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-limit-range
+spec:
+  limits:
+    - default:
+        cpu: "1"
+      defaultRequest:
+        cpu: "0.5"
+      type: Container
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  namespace: go-testing
+  name: pod-reader-role
+  labels:
+    app: go-cloud-k8s-shell
+
+rules:
+  - apiGroups: [""]  # "" indicates the core API group
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "watch", "list"]
+# to allow reading pods logs with : kubectl logs -l app=go-cloud-k8s-shell --all-containers=true -n test-go-cloud-k8s-shell
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-reader-role-binding
+  labels:
+    app: go-cloud-k8s-shell
+subjects:
+  - kind: Group
+    name: system:serviceaccounts
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: pod-reader-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: service-reader-role
+  labels:
+    app: go-cloud-k8s-shell
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: service-reader-role-binding
+  labels:
+    app: go-cloud-k8s-shell
+subjects:
+  - kind: Group
+    name: system:serviceaccounts
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: service-reader-role
+  apiGroup: rbac.authorization.k8s.io
+---
+## with this service you can connect from another pod with
+## curl http://go-cloud-k8s-shell-service.go-testing:9999
+apiVersion: v1
+kind: Service                    # Type of kubernetes resource
+metadata:
+  name: go-cloud-k8s-shell-service   # Name of the resource
+  namespace: go-testing
+  labels:     # The labels that will be applied
+    app: go-cloud-k8s-shell
+#  annotations:
+#    externalTrafficPolicy: "local"
+spec:
+  #type: ClusterIP                 # A ClusterIP service is the default Kubernetes service. It gives you a stable IP address that other apps can use to reach your service.
+  #type: NodePort                 # A port is opened on each node in your cluster via Kube proxy.
+  # https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+  type: LoadBalancer             # Adds a load balancer (from the cloud provider)
+  # k3s will deploy a daemonset listening on the given port on the host node
+  # By default k3s have a builtin load balancer called "klipper" https://github.com/k3s-io/klipper-lb ok for one dev node.
+  # It is possible to run multiple Services on the same node, as long as they use different ports.
+  # in case you are using a 'real' k3s cluster with multiple nodes consider using metalLB instead
+  #externalTrafficPolicy: Local
+  #loadBalancerSourceRanges:
+  #  - 192.168.0.0/16
+  ports:                         # Take incoming HTTP requests on this port (exposed) and forward them to the targetPort of container
+    - name: http
+      port: 9999
+      targetPort: 9999            # Should match the PORT env variable in deployment and containerPort that the Go application listens on
+  selector:
+    app: go-cloud-k8s-shell         # Map any pod with this label `app=go-cloud-k8s-shell` to this service
+---
+apiVersion: apps/v1
+kind: Deployment                 # Type of Kubernetes resource
+metadata:
+  name: go-cloud-k8s-shell           # Name of the Kubernetes resource
+  namespace: go-testing
+  labels:
+    app: go-cloud-k8s-shell
+spec:
+  replicas: 2                    # Number of pods to run at any given time
+  revisionHistoryLimit: 5        # The number of old ReplicaSets to retain to allow rollback
+  minReadySeconds: 5             # Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 2               # maximum number of pods that can be scheduled above the desired number of pods.
+  selector:
+    matchLabels:
+      app: go-cloud-k8s-shell              # This deployment applies to any Pods matching the specified label
+  template:                      # This deployment will create a set of pods using the configurations in this template
+    metadata:
+      labels:                    # The labels that will be applied to all the pods in this deployment
+        app: go-cloud-k8s-shell
+    spec:                        # Spec for the Pod base config, securityContext can be overridden in container
+      # kubectl label nodes gok8sw01.lausanne.ch kubernetes.io/role=worker
+      # comment the two next lines if you do not have worker nodes (rancher-desktop)
+      #nodeSelector:
+      #  node-type: worker
+      securityContext:           # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+        seccompProfile:
+          type: RuntimeDefault   # https://kubernetes.io/docs/tutorials/security/seccomp/
+        runAsUser: 12221           # using a non privileged user
+        runAsGroup: 12221          # using the group 'gouser' as in Dockerfile
+        fsGroup: 100             # by adding fsGroup field, all processes of the container are also part
+                                 # of the supplementary group ID 100 (users).
+        supplementalGroups:
+          - 100
+      containers:
+      - name: go-cloud-k8s-shell
+        image: ghcr.io/lao-tseu-is-alive/go-cloud-k8s-shell:v0.3.18
+        imagePullPolicy: Always
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 12221           # using the user 'gouser' created in Dockerfile
+          runAsGroup: 12221          # using the group 'gouser' created in Dockerfile
+          capabilities:
+            drop:
+              - 'ALL'
+          readOnlyRootFilesystem: true
+        ports:
+          - containerPort: 9999  # Should match the PORT env variable above  that the Go application listens on
+        resources:
+          limits:            # resource limit imposed to the pod, the container cannot utilize more res than specified
+            cpu: 1000m       # 1000 millicpu or millicores 1 or 100% of a CPU core of a running node
+            memory: 128Mi
+            ephemeral-storage: "50Mi"
+          requests:          # explicit request of the minimum amount of resources the pod need
+            cpu: 100m        # 100 millicpu or millicores 0.1 or 10% of a CPU core of a running node
+            memory: 32Mi
+            ephemeral-storage: "20Mi"
+        livenessProbe:           # To check the health of the Pod
+          httpGet:
+            path: /health
+            port: 9999
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 15
+          timeoutSeconds: 2
+        readinessProbe:          # To check if the Pod is ready to serve traffic or not
+          httpGet:
+            path: /readiness
+            port: 9999
+            scheme: HTTP
+          initialDelaySeconds: 5
+          timeoutSeconds: 2
+        env:
+          - name: PORT
+            value: "9999"
+          - name: ADMIN_USER
+            valueFrom:
+              configMapKeyRef:
+                key: ADMIN_USER
+                name: app-config-go-cloud-k8s-shell
+          - name: ADMIN_PASSWORD
+            valueFrom:
+              configMapKeyRef:
+                key: ADMIN_PASSWORD
+                name: app-config-go-cloud-k8s-shell
+          - name: ADMIN_EMAIL
+            valueFrom:
+              configMapKeyRef:
+                key: ADMIN_EMAIL
+                name: app-config-go-cloud-k8s-shell
+          - name: ADMIN_ID
+            valueFrom:
+              configMapKeyRef:
+                key: ADMIN_ID
+                name: app-config-go-cloud-k8s-shell
+          - name: ALLOWED_HOSTS
+            valueFrom:
+              configMapKeyRef:
+                key: ALLOWED_HOSTS
+                name: app-config-go-cloud-k8s-shell
+ 
+          - name: JWT_SECRET
+            valueFrom:
+              configMapKeyRef:
+                key: JWT_SECRET
+                name: app-config-go-cloud-k8s-shell
+          - name: JWT_ISSUER_ID
+            valueFrom:
+              configMapKeyRef:
+                key: JWT_ISSUER_ID
+                name: app-config-go-cloud-k8s-shell
+          - name: JWT_CONTEXT_KEY
+            valueFrom:
+              configMapKeyRef:
+                key: JWT_CONTEXT_KEY
+                name: app-config-go-cloud-k8s-shell
+          - name: JWT_AUTH_URL
+            valueFrom:
+              configMapKeyRef:
+                key: JWT_AUTH_URL
+                name: app-config-go-cloud-k8s-shell
+
+          - name: JWT_DURATION_MINUTES
+            valueFrom:
+              configMapKeyRef:
+                key: JWT_DURATION_MINUTES
+                name: app-config-go-cloud-k8s-shell
+          - name: MY_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: MY_POD_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+

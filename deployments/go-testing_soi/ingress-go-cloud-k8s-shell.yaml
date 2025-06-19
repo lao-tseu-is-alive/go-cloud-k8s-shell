@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: go-cloud-k8s-shell-ingress
+  namespace: go-testing
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+  labels:
+    app: go-cloud-k8s-shell
+spec:
+  rules:
+    - host: soi-go-cloud-k8s-shell.lausanne.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: go-cloud-k8s-shell-service
+                port:
+                  number: 9999
+    - host: go-cloud-k8s-shell
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: go-cloud-k8s-shell-service
+                port:
+                  number: 9999
+  tls:
+    - hosts:
+        - soi-go-cloud-k8s-shell.lausanne.ch
+      secretName: go-cloud-k8s-shell-tls
