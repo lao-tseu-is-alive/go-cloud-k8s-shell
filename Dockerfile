@@ -56,12 +56,11 @@ LABEL org.opencontainers.image.version="${APP_REVISION}"
 LABEL org.opencontainers.image.revision="${APP_REVISION}"
 LABEL org.opencontainers.image.created="${BUILD}"
 
-RUN apt-get update && apt-get install -y iproute2 file checksec nmap postgresql-client curl jq iputils-ping dnsutils tcpdump iftop netcat-openbsd wget && apt-get -y upgrade && apt-get clean
+RUN apt-get update && apt-get install -y iproute2 file checksec nmap postgresql-client curl jq iputils-ping dnsutils tcpdump iftop netcat-openbsd wget procps && apt-get -y upgrade && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser
 RUN groupadd pcap && usermod -a -G pcap gouser && chmod a+x /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip  /usr/sbin/iftop
 WORKDIR /tmp
-#RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-RUN curl -LO "https://dl.k8s.io/release/v1.33.1/bin/linux/amd64/kubectl"
+RUN curl -LO "https://dl.k8s.io/release/v1.33.2/bin/linux/amd64/kubectl"
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 WORKDIR /home/gouser
 
@@ -74,8 +73,28 @@ COPY scripts/checkOtherPodConnectivityInsideContainer.sh ./
 COPY certificates/isrg-root-x1-cross-signed.pem ./certificates/
 RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh && chmod a+x ./getServiceEndPointFromInsideContainer.sh &&  chmod a+x ./checkOtherPodConnectivityInsideContainer.sh
 
+
+# --- Start LS_COLORS configuration ---
+# Generate a default ~/.dircolors file for the gouser
+RUN dircolors -p > /home/gouser/.dircolors && \
+    # Append the LS_COLORS setup to .bashrc.
+    # Ubuntu's default .bashrc often has this logic already, but explicitly adding
+    # it ensures it's there and uses the generated ~/.dircolors if present.
+    echo '\n# Configure LS_COLORS for colored `ls` output\n\
+if [ -x /usr/bin/dircolors ]; then\n\
+    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"\n\
+    alias ls="ls --color=auto"\n\
+    alias grp="grep --color=auto"\n\
+fi' >> /home/gouser/.bashrc && \
+    # Ensure that .bashrc is sourced for interactive shells.
+    # This part is generally handled by the login process if it's an interactive shell.
+    # However, for consistency and future proofing, ensuring the shell setup is complete.
+    chown gouser:gouser /home/gouser/.dircolors /home/gouser/.bashrc
+# --- End LS_COLORS configuration ---
+
 # Switch to non-root user:
 USER gouser
+
 RUN echo 'source <(kubectl completion bash)\n\
 alias k=kubectl\n\
 alias lsa="ls -al -tr"\n\
