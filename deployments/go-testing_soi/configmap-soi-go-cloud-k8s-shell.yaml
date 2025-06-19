@@ -1,0 +1,7 @@
+apiVersion: v1
+data:
+  JWT_DURATION_MINUTES: "20"
+  PORT: "9999"
+kind: ConfigMap
+metadata:
+  name: app-config-go-cloud-k8s-shell

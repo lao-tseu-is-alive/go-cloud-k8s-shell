@@ -33,7 +33,5 @@ go_admin_credentials_secrets
 /coverage.out
 /deployments/go-testing_soi/secret/comodo_2024.bundle
 /deployments/go-testing_soi/secret/comodo_lausanne_ch_2024_nopassword.key
-/deployments/go-testing_soi/configmap-soi-go-cloud-k8s-shell.yaml
-/deployments/go-testing_soi/secret/comodo_2024.bundle
-/deployments/go-testing_soi/secret/comodo_lausanne_ch_2024_nopassword.key
-/deployments/go-testing_soi/configmap-soi-go-cloud-k8s-shell.yaml
+/deployments/go-testing_soi/app-secrets-go-cloud-k8s-shell.yaml
+/deployments/go-testing_soi/sealed-app-secrets-go-cloud-k8s-shell.yaml

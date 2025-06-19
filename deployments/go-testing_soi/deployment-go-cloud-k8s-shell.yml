@@ -231,50 +231,50 @@ spec:
             value: "9999"
           - name: ADMIN_USER
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: ADMIN_USER
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
           - name: ADMIN_PASSWORD
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: ADMIN_PASSWORD
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
           - name: ADMIN_EMAIL
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: ADMIN_EMAIL
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
           - name: ADMIN_ID
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: ADMIN_ID
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
           - name: ALLOWED_HOSTS
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: ALLOWED_HOSTS
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
  
           - name: JWT_SECRET
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: JWT_SECRET
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
           - name: JWT_ISSUER_ID
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: JWT_ISSUER_ID
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
           - name: JWT_CONTEXT_KEY
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: JWT_CONTEXT_KEY
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
           - name: JWT_AUTH_URL
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 key: JWT_AUTH_URL
-                name: app-config-go-cloud-k8s-shell
+                name: app-secrets-go-cloud-k8s-shell
 
           - name: JWT_DURATION_MINUTES
             valueFrom:
