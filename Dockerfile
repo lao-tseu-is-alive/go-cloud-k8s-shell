@@ -36,7 +36,7 @@ RUN APP_REPOSITORY_CLEAN=$(echo $APP_REPOSITORY | sed 's|https://||') && \
 
 
 ######## Start a new stage  #######
-FROM ubuntu:24.04
+FROM ubuntu:24.10
 # to comply with security best practices
 # Running containers with 'root' user can lead to a container escape situation (the default with Docker...).
 # It is a best practice to run containers as non-root users
