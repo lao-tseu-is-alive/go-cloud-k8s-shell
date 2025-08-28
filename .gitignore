@@ -35,3 +35,6 @@ go_admin_credentials_secrets
 /deployments/go-testing_soi/secret/comodo_lausanne_ch_2024_nopassword.key
 /deployments/go-testing_soi/app-secrets-go-cloud-k8s-shell.yaml
 /deployments/go-testing_soi/sealed-app-secrets-go-cloud-k8s-shell.yaml
+/certs/comodo_2025.bundle
+/certs/comodo_lausanne_ch_2025_nopassword.key
+/certs/fullchain_2025.pem

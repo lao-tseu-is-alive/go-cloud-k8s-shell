@@ -3,12 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttp"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/info"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/tools"
-	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"log"
 	"net/http"
@@ -17,6 +11,14 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttp"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttpclient"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/info"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/tools"
+	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -113,7 +115,7 @@ func TestMainExecution(t *testing.T) {
 	// starting main in his own go routine
 	var wg sync.WaitGroup
 	startMainServer(&wg)
-	gohttp.WaitForHttpServer(listenAddr, 1*time.Second, 10)
+	gohttpclient.WaitForHttpServer(listenAddr, 1*time.Second, 10, l)
 
 	tests := []TestMainStruct{
 		{
@@ -203,12 +205,12 @@ func TestMainExecution(t *testing.T) {
 func init() {
 	var err error
 	if DEBUG {
-		l, err = golog.NewLogger("zap", golog.DebugLevel, fmt.Sprintf("test_%s ", version.APP))
+		l, err = golog.NewLogger("zap", os.Stdout, golog.DebugLevel, fmt.Sprintf("testing_%s ", "test"))
 		if err != nil {
 			log.Fatalf("💥💥 error golog.NewLogger error: %v'\n", err)
 		}
 	} else {
-		l, err = golog.NewLogger("zap", golog.ErrorLevel, fmt.Sprintf("test_%s ", version.APP))
+		l, err = golog.NewLogger("zap", os.Stdout, golog.ErrorLevel, fmt.Sprintf("testing_%s ", "test"))
 		if err != nil {
 			log.Fatalf("💥💥 error golog.NewLogger error: %v'\n", err)
 		}

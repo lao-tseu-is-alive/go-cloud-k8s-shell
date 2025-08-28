@@ -1,5 +1,5 @@
 # Start from the latest golang base image
-FROM golang:1.24.4-alpine3.22 AS builder
+FROM golang:1.25-alpine3.22 AS builder
 
 # Define build arguments for version and build timestamp
 ARG APP_REVISION
@@ -36,7 +36,7 @@ RUN APP_REPOSITORY_CLEAN=$(echo $APP_REPOSITORY | sed 's|https://||') && \
 
 
 ######## Start a new stage  #######
-FROM ubuntu:24.10
+FROM ubuntu:25.10
 # to comply with security best practices
 # Running containers with 'root' user can lead to a container escape situation (the default with Docker...).
 # It is a best practice to run containers as non-root users
@@ -75,20 +75,13 @@ RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh
 
 
 # --- Start LS_COLORS configuration ---
-# Generate a default ~/.dircolors file for the gouser
 RUN dircolors -p > /home/gouser/.dircolors && \
-    # Append the LS_COLORS setup to .bashrc.
-    # Ubuntu's default .bashrc often has this logic already, but explicitly adding
-    # it ensures it's there and uses the generated ~/.dircolors if present.
     echo '\n# Configure LS_COLORS for colored `ls` output\n\
 if [ -x /usr/bin/dircolors ]; then\n\
     test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"\n\
     alias ls="ls --color=auto"\n\
     alias grp="grep --color=auto"\n\
 fi' >> /home/gouser/.bashrc && \
-    # Ensure that .bashrc is sourced for interactive shells.
-    # This part is generally handled by the login process if it's an interactive shell.
-    # However, for consistency and future proofing, ensuring the shell setup is complete.
     chown gouser:gouser /home/gouser/.dircolors /home/gouser/.bashrc
 # --- End LS_COLORS configuration ---
 

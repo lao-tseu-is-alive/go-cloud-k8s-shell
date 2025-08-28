@@ -3,22 +3,24 @@ package main
 import (
 	"embed"
 	"fmt"
+	"io/fs"
+	"log"
+	"mime"
+	"net/http"
+	"time"
+
 	"github.com/jub0bs/cors"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/config"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/gohttp"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-common/pkg/golog"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/shell"
 	"github.com/lao-tseu-is-alive/go-cloud-k8s-shell/pkg/version"
-	"io/fs"
-	"log"
-	"mime"
-	"net/http"
-	"time"
 )
 
 const (
 	defaultPort       = 9999
 	defaultServerIp   = "0.0.0.0"
+	defaultLogName    = "stderr"
 	defaultWebRootDir = "front/dist"
 	defaultAdminId    = 99999
 	defaultAdminUser  = "goadmin"
@@ -61,7 +63,12 @@ func GetMyDefaultHandler(s *gohttp.Server, webRootDir string, content embed.FS) 
 }
 
 func main() {
-	l, err := golog.NewLogger("simple", golog.DebugLevel, fmt.Sprintf("%s ", version.APP))
+	l, err := golog.NewLogger(
+		"simple",
+		config.GetLogWriterFromEnvOrPanic(defaultLogName),
+		config.GetLogLevelFromEnvOrPanic(golog.InfoLevel),
+		version.APP,
+	)
 	if err != nil {
 		log.Fatalf("💥💥 error log.NewLogger error: %v'\n", err)
 	}
@@ -80,18 +87,19 @@ func main() {
 		l)
 	// Create a new Authenticator with a simple admin user
 	myAuthenticator := gohttp.NewSimpleAdminAuthenticator(
-		config.GetAdminUserFromFromEnvOrPanic(defaultAdminUser),
-		config.GetAdminPasswordFromFromEnvOrPanic(),
-		config.GetAdminEmailFromFromEnvOrPanic(defaultAdminEmail),
-		config.GetAdminIdFromFromEnvOrPanic(defaultAdminId),
+		config.GetAdminUserFromEnvOrPanic(defaultAdminUser),
+		config.GetAdminPasswordFromEnvOrPanic(),
+		config.GetAdminEmailFromEnvOrPanic(defaultAdminEmail),
+		config.GetAdminIdFromEnvOrPanic(defaultAdminId),
 		myJwt)
+
 	server := gohttp.CreateNewServerFromEnvOrFail(
 		defaultPort,
-		defaultServerIp,
-		myAuthenticator,
-		myJwt,
-		myVersionReader,
-		l)
+		defaultServerIp, version.APP, l,
+		gohttp.WithAuthentication(myAuthenticator),
+		gohttp.WithJwtChecker(myJwt),
+		gohttp.WithVersionReader(myVersionReader),
+	)
 
 	allowedHosts := config.GetAllowedHostsFromEnvOrPanic()
 	server.AddRoute("GET /info", gohttp.GetInfoHandler(server))
