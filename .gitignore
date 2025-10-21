@@ -38,3 +38,4 @@ go_admin_credentials_secrets
 /certs/comodo_2025.bundle
 /certs/comodo_lausanne_ch_2025_nopassword.key
 /certs/fullchain_2025.pem
+/.env_test
