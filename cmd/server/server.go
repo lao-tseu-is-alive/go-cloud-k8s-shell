@@ -118,6 +118,17 @@ func main() {
 	corsMw.SetDebug(true) // turn debug mode on (optional)
 
 	mux.Handle("GET /goAppInfo", corsMw.Wrap(gohttp.GetAppInfoHandler(server)))
+	mux.Handle("GET /health", server.GetHealthHandler(
+		func(msg string) bool {
+			return true
+		},
+		fmt.Sprintf("%s v%s", version.APP, version.VERSION)))
+
+	mux.Handle("GET /readiness", server.GetHealthHandler(
+		func(msg string) bool {
+			return true
+		},
+		fmt.Sprintf("%s v%s", version.APP, version.VERSION)))
 
 	mux.Handle(fmt.Sprintf("POST %s", jwtAuthUrl), corsMw.Wrap(gohttp.GetLoginPostHandler(server)))
 	mux.Handle("GET /goshell", shell.GetShellHandler(shell.HandlerOpts{
