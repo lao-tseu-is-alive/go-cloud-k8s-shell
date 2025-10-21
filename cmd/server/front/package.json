@@ -12,7 +12,7 @@
     "@types/crypto-js": "^4.2.2",
     "prettier": "^3.5.3",
     "typescript": "^5.8.3",
-    "vite": "7.1.5"
+    "vite": "7.1.11"
   },
   "dependencies": {
     "@xterm/addon-attach": "^0.11.0",
