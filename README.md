@@ -6,12 +6,16 @@
 [![cve-trivy-scan](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/cve-trivy-scan.yml/badge.svg)](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/cve-trivy-scan.yml)
 [![codecov](https://codecov.io/gh/lao-tseu-is-alive/go-cloud-k8s-shell/branch/main/graph/badge.svg)](https://codecov.io/gh/lao-tseu-is-alive/go-cloud-k8s-shell)
 [![Go Test](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/go-test.yml/badge.svg)](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/go-test.yml)
+[![Docker Publish](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/lao-tseu-is-alive/go-cloud-k8s-shell/actions/workflows/docker-publish.yml)
 
 ## Overview 🚀
 
 `go-cloud-k8s-shell` provides secure, web-based shell access to containers running within a Kubernetes cluster. It's a Go microservice featuring a web frontend built with TypeScript and Vite, utilizing xterm.js for the terminal interface and WebSockets for communication.
 
-This tool is designed for interacting with Kubernetes environments, offering essential command-line utilities within the container for testing, debugging, and managing cluster resources.
+This tool is designed for interacting securely with Kubernetes environments, offering essential command-line utilities within the container for testing, debugging, and managing cluster resources.
+
+![Image of the bash shell in your browser](https://raw.githubusercontent.com/lao-tseu-is-alive/go-cloud-k8s-shell/refs/heads/main/images/goCloudK8sShell-UI.png)
+
 
 ## ✨ Features
 
@@ -37,6 +41,7 @@ This tool is designed for interacting with Kubernetes environments, offering ess
 * **Containerization:** Docker or better under Linux : [Podman](https://podman.io/) or  [NerdCtl](https://github.com/containerd/nerdctl)
 * **Orchestration:** [Kubernetes](https://kubernetes.io/) [K3S](https://k3s.io/)
 * **Security scanner** [Trivy](https://trivy.dev/latest/)
+
 
 ## 🏁 Getting Started
 
