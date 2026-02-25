@@ -1,6 +1,6 @@
 module github.com/lao-tseu-is-alive/go-cloud-k8s-shell
 
-go 1.25.3
+go 1.26.0
 
 require (
 	github.com/creack/pty v1.1.24
