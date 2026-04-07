@@ -56,11 +56,12 @@ LABEL org.opencontainers.image.version="${APP_REVISION}"
 LABEL org.opencontainers.image.revision="${APP_REVISION}"
 LABEL org.opencontainers.image.created="${BUILD}"
 
-RUN apt-get update && apt-get install -y iproute2 file checksec nmap postgresql-client curl jq iputils-ping dnsutils tcpdump iftop netcat-openbsd wget procps && apt-get -y upgrade && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install --no-install-recommends -y iproute2 file checksec nmap postgresql-client curl jq iputils-ping dnsutils tcpdump iftop netcat-openbsd wget procps &&  apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN rm -f /usr/bin/pebble
 RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser
 RUN groupadd pcap && usermod -a -G pcap gouser && chmod a+x /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip  /usr/sbin/iftop
 WORKDIR /tmp
-RUN curl -LO "https://dl.k8s.io/release/v1.35.1/bin/linux/amd64/kubectl"
+RUN curl -LO "https://dl.k8s.io/release/v1.35.3/bin/linux/amd64/kubectl"
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 WORKDIR /home/gouser
 
