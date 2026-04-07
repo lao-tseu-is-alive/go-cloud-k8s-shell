@@ -11,6 +11,7 @@ env:
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
 
+
 jobs:
   build-scan-and-push:
     runs-on: ubuntu-latest
@@ -43,7 +44,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.26.0'
+          go-version: '^1.26.1'
+      - run: go version
 
       - name: Test and coverage
         env:
@@ -97,9 +99,11 @@ jobs:
 
       # 2. Run your verified Trivy scanner
       - name: Run Trivy vulnerability scanner
-        # v0.34.0 - pinned to commit SHA to prevent supply chain attacks,
+        # v0.35.0 - pinned to commit SHA to prevent supply chain attacks,
         # see: https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions
-        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284
+        uses: aquasecurity/trivy-action@v0.35.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Prevents rate limiting
         with:
           image-ref: '${{ github.repository }}:${{ github.sha }}'
           severity: 'MEDIUM,CRITICAL,HIGH'
@@ -131,7 +135,7 @@ jobs:
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25
         with:
           context: .
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
