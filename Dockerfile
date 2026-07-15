@@ -36,7 +36,7 @@ RUN APP_REPOSITORY_CLEAN=$(echo $APP_REPOSITORY | sed 's|https://||') && \
 
 
 ######## Start a new stage  #######
-FROM ubuntu:26.04
+FROM alpine:3.24
 # to comply with security best practices
 # Running containers with 'root' user can lead to a container escape situation (the default with Docker...).
 # It is a best practice to run containers as non-root users
@@ -56,13 +56,32 @@ LABEL org.opencontainers.image.version="${APP_REVISION}"
 LABEL org.opencontainers.image.revision="${APP_REVISION}"
 LABEL org.opencontainers.image.created="${BUILD}"
 
-RUN apt-get update && apt-get install -y iproute2 file checksec nmap postgresql-client curl jq iputils-ping dnsutils tcpdump iftop netcat-openbsd wget procps ca-certificates &&  apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN rm -f /usr/bin/pebble
-RUN useradd --create-home --home-dir /home/gouser --shell /bin/bash --user-group --groups users --uid 12221 gouser
-RUN groupadd pcap && usermod -a -G pcap gouser && chmod a+x /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip /usr/bin/tcpdump && setcap cap_net_raw,cap_net_admin=eip  /usr/sbin/iftop
-WORKDIR /tmp
-RUN curl -LO "https://dl.k8s.io/release/v1.36.2/bin/linux/amd64/kubectl"
-RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+RUN apk upgrade --no-cache --available && \
+    apk add --no-cache --upgrade \
+        bash \
+        bind-tools \
+        ca-certificates \
+        curl \
+        file \
+        iftop \
+        iproute2 \
+        iputils \
+        jq \
+        kubectl \
+        libcap \
+        netcat-openbsd \
+        nmap \
+        postgresql-client \
+        procps \
+        tcpdump && \
+    update-ca-certificates
+RUN addgroup -S pcap && \
+    addgroup -g 12221 gouser && \
+    adduser -D -h /home/gouser -s /bin/bash -G gouser -u 12221 gouser && \
+    addgroup gouser pcap && \
+    chmod a+x "$(command -v tcpdump)" "$(command -v iftop)" && \
+    setcap cap_net_raw,cap_net_admin=eip "$(command -v tcpdump)" && \
+    setcap cap_net_raw,cap_net_admin=eip "$(command -v iftop)"
 WORKDIR /home/gouser
 
 # Copy the Pre-built binary file from the previous stage
@@ -76,14 +95,10 @@ RUN chmod a+x ./getK8SApiFromUrl.sh && chmod a+x ./checkK8SApiInsideContainer.sh
 
 
 # --- Start LS_COLORS configuration ---
-RUN dircolors -p > /home/gouser/.dircolors && \
-    echo '\n# Configure LS_COLORS for colored `ls` output\n\
-if [ -x /usr/bin/dircolors ]; then\n\
-    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"\n\
-    alias ls="ls --color=auto"\n\
-    alias grp="grep --color=auto"\n\
-fi' >> /home/gouser/.bashrc && \
-    chown gouser:gouser /home/gouser/.dircolors /home/gouser/.bashrc
+RUN echo '\n# Configure colored shell output\n\
+alias ls="ls --color=auto"\n\
+alias grep="grep --color=auto"' >> /home/gouser/.bashrc && \
+    chown gouser:gouser /home/gouser/.bashrc
 # --- End LS_COLORS configuration ---
 
 # Switch to non-root user:

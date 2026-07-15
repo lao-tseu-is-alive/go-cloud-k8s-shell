@@ -231,7 +231,7 @@ GitHub Actions workflows are configured for:
 
 + JWT Authentication: Protects the WebSocket endpoint.
 
-Dockerfile Security: Uses specific Go and Ubuntu base image versions. Installs necessary tools securely. Applies file permissions and capabilities settings.
+Dockerfile Security: Uses specific Go and Alpine base image versions. Installs necessary tools securely. Applies file permissions and capabilities settings.
 
 ### More info :
 
