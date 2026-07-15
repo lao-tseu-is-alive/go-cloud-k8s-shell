@@ -71,7 +71,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		tty, err := pty.Start(cmd)
 		if err != nil {
 			message := fmt.Sprintf("failed to start tty: %s", err)
-			clog.Warn(message)
+			clog.Warn("%s", message)
 			err := connection.WriteMessage(websocket.TextMessage, []byte(message))
 			if err != nil {
 				clog.Warn("failed to send error message to xterm.js: %s", err)
@@ -120,11 +120,11 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		infoCloseReason := ""
 		go func(errChan chan<- error, done <-chan struct{}) {
 			goRoutineName := "Ping-Goroutine"
-			defer clog.Info(fmt.Sprintf("%s : exiting...", goRoutineName))
+			defer clog.Info("%s : exiting...", goRoutineName)
 			for {
 				select {
 				case <-done:
-					clog.Info(fmt.Sprintf("%s : connection is closed, exiting from tty >> xterm.js...", goRoutineName))
+					clog.Info("%s : connection is closed, exiting from tty >> xterm.js...", goRoutineName)
 					return
 				default:
 					if err := connection.WriteMessage(websocket.PingMessage, []byte("keepalive")); err != nil {
@@ -134,14 +134,14 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 					time.Sleep(keepalivePingTimeout / 2)
 					if time.Now().Sub(lastPongTime) > keepalivePingTimeout {
 						msg := fmt.Sprintf("%s : failed to get response from ping, triggering disconnect now...", goRoutineName)
-						clog.Warn(msg)
+						clog.Warn("%s", msg)
 						errChan <- errors.New(msg)
 						return
 					}
 					clog.Debug("received response from ping successfully")
 					if !claims.IsValidAt(time.Now()) {
 						msg := fmt.Sprintf("%s : token has expired, triggering disconnect now...", goRoutineName)
-						clog.Warn(msg)
+						clog.Warn("%s", msg)
 						infoCloseReason = "token has expired"
 						errChan <- errors.New(msg)
 						return
@@ -155,17 +155,17 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		// sending bash tty terminal data ==> to client xterm.js
 		go func(errChan chan<- error, done <-chan struct{}) {
 			goRoutineName := "SendingToXTerm"
-			defer clog.Info(fmt.Sprintf("%s : exiting...", goRoutineName))
+			defer clog.Info("%s : exiting...", goRoutineName)
 			errorCounter := 0
 			for {
 				select {
 				case <-done:
-					clog.Info(fmt.Sprintf("%s : connection is closed, exiting from tty >> xterm.js...", goRoutineName))
+					clog.Info("%s : connection is closed, exiting from tty >> xterm.js...", goRoutineName)
 					return
 				default:
 					if errorCounter > connectionErrorLimit {
 						msg := fmt.Sprintf("error in %s: connection error limit reached, closing connection...", goRoutineName)
-						clog.Warn(msg)
+						clog.Warn("%s", msg)
 						errChan <- errors.New(msg)
 						break
 					}
@@ -173,7 +173,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 					readLength, err := tty.Read(buffer)
 					if err != nil {
 						msg := fmt.Sprintf("error in %s: failed to read from tty: %s", goRoutineName, err)
-						clog.Warn(msg)
+						clog.Warn("%s", msg)
 						if err := connection.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("📣 server is closing conection,'%s' bye!", infoCloseReason))); err != nil {
 							clog.Warn("%s : failed to send termination message from tty to xterm.js: %s", goRoutineName, err)
 						}
@@ -194,18 +194,18 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 		// tty << xterm.js
 		go func(errChan chan<- error, done <-chan struct{}) {
 			goRoutineName := "ReadingFromXTerm"
-			defer clog.Info(fmt.Sprintf("%s : exiting...", goRoutineName))
+			defer clog.Info("%s : exiting...", goRoutineName)
 			for {
 				select {
 				case <-done:
-					clog.Info(fmt.Sprintf("%s : connection is closed, exiting from tty << xterm.js...", goRoutineName))
+					clog.Info("%s : connection is closed, exiting from tty << xterm.js...", goRoutineName)
 					return
 				default:
 					// data processing
 					messageType, data, err := connection.ReadMessage()
 					if err != nil {
 						msg := fmt.Sprintf("error in %s, failed to get next reader. err: %s", goRoutineName, err)
-						clog.Warn(msg)
+						clog.Warn("%s", msg)
 						errChan <- errors.New(msg)
 						return
 					}
@@ -246,7 +246,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 					// write to tty
 					bytesWritten, err := tty.Write(dataBuffer)
 					if err != nil {
-						clog.Warn(fmt.Sprintf("failed to write %v bytes to tty: %s", len(dataBuffer), err))
+						clog.Warn("failed to write %v bytes to tty: %s", len(dataBuffer), err)
 						errChan <- fmt.Errorf("error in %s: failed to write to tty", goRoutineName)
 						continue
 					}
@@ -257,7 +257,7 @@ func GetShellHandler(opts HandlerOpts) http.HandlerFunc {
 
 		select {
 		case err = <-errChan:
-			clog.Warn(fmt.Sprintf("Error occurred in one of goroutines : '%v'", err))
+			clog.Warn("Error occurred in one of goroutines : '%v'", err)
 			// Signal to all goroutines to exit
 			close(done)
 		}
