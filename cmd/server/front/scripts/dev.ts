@@ -118,7 +118,7 @@ Bun.serve({
       });
     } catch (error) {
       console.error(error);
-      return new Response(String(error), { status: 500 });
+      return new Response("Internal dev server error", { status: 500 });
     }
   },
 });
