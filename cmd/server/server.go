@@ -108,7 +108,7 @@ func main() {
 
 	// create CORS middleware
 	corsMw, err := cors.NewMiddleware(cors.Config{
-		Origins:        []string{"http://localhost:5173"}, // for vite js dev server
+		Origins:        []string{"http://localhost:5173"}, // for the frontend dev server
 		Methods:        []string{http.MethodGet, http.MethodPost},
 		RequestHeaders: []string{"Authorization"},
 	})

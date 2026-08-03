@@ -9,7 +9,7 @@
 
 ## Overview 🚀
 
-`go-cloud-k8s-shell` provides secure, web-based shell access to containers running within a Kubernetes cluster. It's a Go microservice featuring a web frontend built with TypeScript and Vite, utilizing xterm.js for the terminal interface and WebSockets for communication.
+`go-cloud-k8s-shell` provides secure, web-based shell access to containers running within a Kubernetes cluster. It's a Go microservice featuring a web frontend built with TypeScript and Bun, utilizing xterm.js for the terminal interface and WebSockets for communication.
 
 This tool is designed for interacting securely with Kubernetes environments, offering essential command-line utilities within the container for testing, debugging, and managing cluster resources.
 
@@ -34,7 +34,7 @@ This tool is designed for interacting securely with Kubernetes environments, off
 ## 🛠️ Technology Stack
 
 * **Backend:** [Go](https://go.dev/) 
-* **Frontend:** TypeScript, Vite, xterm.js & addons
+* **Frontend:** TypeScript, Bun, xterm.js & addons
 * **Communication:** WebSockets
 * **Authentication:** JSON Web Token [JWT](https://jwt.io)
 * **Containerization:** Docker or better under Linux : [Podman](https://podman.io/) or  [NerdCtl](https://github.com/containerd/nerdctl)
@@ -47,7 +47,7 @@ This tool is designed for interacting securely with Kubernetes environments, off
 ### Prerequisites
 
 * Go (version specified in `go.mod`)
-* Node.js and npm/yarn (for frontend development)
+* Bun (for frontend development)
 * Docker or nerdctl
 * kubectl
 * Access to a Kubernetes cluster
@@ -62,8 +62,8 @@ This tool is designed for interacting securely with Kubernetes environments, off
 2.  **Frontend:**
     ```bash
     cd cmd/server/front
-    npm install
-    npm run build
+    bun install
+    bun run build
     cd ../../..
     ```
    
