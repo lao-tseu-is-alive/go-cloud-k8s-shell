@@ -38,7 +38,7 @@ if (!script) {
 }
 
 const assetPath = (path: string) =>
-  `/${relative(distDir, path).replaceAll("\\", "/")}`;
+  `/${relative(distDir, path).replace(/\\/g, "/")}`;
 
 await writeFile(
   join(distDir, "index.html"),

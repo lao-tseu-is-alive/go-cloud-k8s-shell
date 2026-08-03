@@ -39,7 +39,7 @@ async function build() {
   }
 
   const assetPath = (path: string) =>
-    `/${relative(devDir, path).replaceAll("\\", "/")}`;
+    `/${relative(devDir, path).replace(/\\/g, "/")}`;
   const index = `<!doctype html>
 <html lang="en">
 <head>
