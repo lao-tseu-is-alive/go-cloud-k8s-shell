@@ -99,9 +99,9 @@ jobs:
 
       # 2. Run your verified Trivy scanner
       - name: Run Trivy vulnerability scanner
-        # v0.35.0 - pinned to commit SHA to prevent supply chain attacks,
+        # v0.36.0 - pinned to commit SHA to prevent supply chain attacks,
         # see: https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Prevents rate limiting
         with:
@@ -147,4 +147,3 @@ jobs:
           # Use build cache to speed up subsequent runs
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
